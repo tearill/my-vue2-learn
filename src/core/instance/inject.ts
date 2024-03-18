@@ -64,9 +64,13 @@ export function resolveInject(
       // #6574 in case the inject object is observed...
       if (key === '__ob__') continue
       const provideKey = inject[key].from
+
+      // 判断 inject 注册的值是否有对应的 provider
       if (provideKey in vm._provided) {
         result[key] = vm._provided[provideKey]
       } else if ('default' in inject[key]) {
+
+        // 存在默认值
         const provideDefault = inject[key].default
         result[key] = isFunction(provideDefault)
           ? provideDefault.call(vm)

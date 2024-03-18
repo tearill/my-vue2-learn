@@ -51,19 +51,28 @@ export function proxy(target: Object, sourceKey: string, key: string) {
 
 export function initState(vm: Component) {
   const opts = vm.$options
+
+  // 初始化 props
   if (opts.props) initProps(vm, opts.props)
 
   // Composition API
   initSetup(vm)
 
+  // 初始化 method 方法
   if (opts.methods) initMethods(vm, opts.methods)
+
+  // 初始化 data
   if (opts.data) {
     initData(vm)
   } else {
     const ob = observe((vm._data = {}))
     ob && ob.vmCount++
   }
+
+  // 初始化 computed 计算属性
   if (opts.computed) initComputed(vm, opts.computed)
+
+  // 初始化 watch 监听
   if (opts.watch && opts.watch !== nativeWatch) {
     initWatch(vm, opts.watch)
   }

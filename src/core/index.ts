@@ -4,6 +4,8 @@ import { isServerRendering } from 'core/util/env'
 import { FunctionalRenderContext } from 'core/vdom/create-functional-component'
 import { version } from 'v3'
 
+// 挂载 Vue 的 API
+// mixin、use 等等
 initGlobalAPI(Vue)
 
 Object.defineProperty(Vue.prototype, '$isServer', {

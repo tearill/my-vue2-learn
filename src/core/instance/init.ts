@@ -14,6 +14,7 @@ import { EffectScope } from 'v3/reactivity/effectScope'
 let uid = 0
 
 export function initMixin(Vue: typeof Component) {
+  // 向 Vue 原型上挂载 _init 方法
   Vue.prototype._init = function (options?: Record<string, any>) {
     const vm: Component = this
     // a uid
@@ -38,6 +39,8 @@ export function initMixin(Vue: typeof Component) {
     // render of a parent component
     vm._scope.parent = undefined
     vm._scope._vm = true
+
+    // 合并 options，将传入的 options 合并到 $options 上
     // merge options
     if (options && options._isComponent) {
       // optimize internal component instantiation
@@ -59,13 +62,31 @@ export function initMixin(Vue: typeof Component) {
     }
     // expose real self
     vm._self = vm
+
+    // 下面的这些 init 操作，都会往 Vue 上挂载一系列相关参数
+    // 初始化生命周期
     initLifecycle(vm)
+
+    // 初始化事件
     initEvents(vm)
+
+    // 初始化 render 函数
     initRender(vm)
+
+    // 调用 beforeCreate 生命周期函数
     callHook(vm, 'beforeCreate', undefined, false /* setContext */)
+
+    // 在 data/props 初始化之前，先把 inject 传进来的数据进行处理
     initInjections(vm) // resolve injections before data/props
+
+    // 初始化 state，也就是组件的 "状态"
+    // 对 props、methods、data、computed 和 watcher 等属性做了初始化操作
     initState(vm)
+
+    // 初始化 provider 提供的值
     initProvide(vm) // resolve provide after data/props
+
+    // 调用 created 生命周期函数
     callHook(vm, 'created')
 
     /* istanbul ignore if */
@@ -75,7 +96,10 @@ export function initMixin(Vue: typeof Component) {
       measure(`vue ${vm._name} init`, startTag, endTag)
     }
 
+    // 挂载 Vue
     if (vm.$options.el) {
+
+      // 调用 $mount 挂载，将 el 传递的字符串转换成 DOM 对象
       vm.$mount(vm.$options.el)
     }
   }
