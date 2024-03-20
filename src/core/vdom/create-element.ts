@@ -24,6 +24,8 @@ const ALWAYS_NORMALIZE = 2
 
 // wrapper function for providing a more flexible interface
 // without getting yelled at by flow
+// 这个函数只是对真正创建 VNode 的 _createElement 函数封装了一层
+// 这个函数只是对参数做了一层处理，不进行额外的操作
 export function createElement(
   context: Component,
   tag: any,
@@ -32,6 +34,10 @@ export function createElement(
   normalizationType: any,
   alwaysNormalize: boolean
 ): VNode | Array<VNode> {
+
+  // 如果 data 是数组或者是基本类型
+  // 参数 data 可以不传递(文本节点)
+  // 如果没有传递 data，移动参数
   if (isArray(data) || isPrimitive(data)) {
     normalizationType = children
     children = data
@@ -50,6 +56,8 @@ export function _createElement(
   children?: any,
   normalizationType?: number
 ): VNode | Array<VNode> {
+
+  // data 已经是响应式的 => 返回创建一个空 VNode
   if (isDef(data) && isDef((data as any).__ob__)) {
     __DEV__ &&
       warn(
@@ -58,12 +66,18 @@ export function _createElement(
         )}\n` + 'Always create fresh vnode data objects in each render!',
         context
       )
+
+    // 创建空的 VNode
     return createEmptyVNode()
   }
   // object syntax in v-bind
+  // 取出动态指定的 component
   if (isDef(data) && isDef(data.is)) {
     tag = data.is
   }
+
+  // 判断动态指定的 <component :is="false"/>，是否是指定了一个 falsy 值
+  // 这个时候对应 html 标签应该是空的
   if (!tag) {
     // in case of component :is set to falsy value
     return createEmptyVNode()
@@ -82,15 +96,30 @@ export function _createElement(
     data.scopedSlots = { default: children[0] }
     children.length = 0
   }
+
+  // children 的规范化
+  // 每一个 VNode 可能会有若干子节点，子节点也应该是 VNode 类型
+  // normalizeChildren 调用场景有两个
+  // 1. render 函数是手写的，当 children 只有一个节点的时候
+  //    可以把 children 写成基础类型来创建单个简单的文本节点
+  //    会调用 createTextVNode 创建一个文本节点的 VNode
+  // 2. 当编译 slot、v-for 的时候会产生嵌套数组的情况，会调用 normalizeArrayChildren 方法
   if (normalizationType === ALWAYS_NORMALIZE) {
     children = normalizeChildren(children)
   } else if (normalizationType === SIMPLE_NORMALIZE) {
+    // simpleNormalizeChildren 调用场景是 render 函数是编译生成的
+    // 函数式组件返回的是一个数组而不是一个根节点
+    // 所以会通过 Array.prototype.concat 方法把整个 children 数组打平，让它的深度只有一层
     children = simpleNormalizeChildren(children)
   }
   let vnode, ns
+
+  // 如果 tag 是字符串，也就是普通 html 标签，会实例化一个普通 VNode 节点
   if (typeof tag === 'string') {
     let Ctor
     ns = (context.$vnode && context.$vnode.ns) || config.getTagNamespace(tag)
+
+    // 判断是否是保留的标签（html、svg 标签）
     if (config.isReservedTag(tag)) {
       // platform built-in elements
       if (
@@ -104,6 +133,8 @@ export function _createElement(
           context
         )
       }
+
+      // 如果是原生的标签，直接创建 VNode 节点就行
       vnode = new VNode(
         config.parsePlatformTagName(tag),
         data,
@@ -125,6 +156,8 @@ export function _createElement(
       vnode = new VNode(tag, data, children, undefined, undefined, context)
     }
   } else {
+
+    // 如果 tag 给的是组件就通过 createComponent 方法创建一个组件 VNode
     // direct component options / constructor
     vnode = createComponent(tag as any, data, context, children)
   }

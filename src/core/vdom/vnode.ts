@@ -77,6 +77,7 @@ export default class VNode {
   }
 }
 
+// 创建空的 VNode，标记为注释节点
 export const createEmptyVNode = (text: string = '') => {
   const node = new VNode()
   node.text = text

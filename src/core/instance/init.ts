@@ -68,6 +68,7 @@ export function initMixin(Vue: typeof Component) {
     initLifecycle(vm)
 
     // 初始化事件
+    // 往原型上挂载 _events、_hasHookEvent 等等属性
     initEvents(vm)
 
     // 初始化 render 函数

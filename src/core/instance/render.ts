@@ -19,11 +19,14 @@ import { currentInstance, setCurrentInstance } from 'v3/currentInstance'
 import { syncSetupSlots } from 'v3/apiSetup'
 
 export function initRender(vm: Component) {
+  // vnode 树根节点
   vm._vnode = null // the root of the child tree
   vm._staticTrees = null // v-once cached trees
   const options = vm.$options
   const parentVnode = (vm.$vnode = options._parentVnode!) // the placeholder node in parent tree
   const renderContext = parentVnode && (parentVnode.context as Component)
+
+  // 处理 slot
   vm.$slots = resolveSlots(options._renderChildren, renderContext)
   vm.$scopedSlots = parentVnode
     ? normalizeScopedSlots(
@@ -32,11 +35,15 @@ export function initRender(vm: Component) {
         vm.$slots
       )
     : emptyObject
+
   // bind the createElement fn to this instance
   // so that we get proper render context inside it.
   // args order: tag, data, children, normalizationType, alwaysNormalize
   // internal version is used by render functions compiled from templates
   // @ts-expect-error
+
+  // 绑定创建 VNode 的函数
+  // 对真正创作 VNode 的 _createElement 封装了一次，让参数更丰富
   vm._c = (a, b, c, d) => createElement(vm, a, b, c, d, false)
   // normalization is always applied for the public version, used in
   // user-written render functions.
