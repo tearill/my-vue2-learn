@@ -44,10 +44,12 @@ export function initRender(vm: Component) {
 
   // 绑定创建 VNode 的函数
   // 对真正创作 VNode 的 _createElement 封装了一次，让参数更丰富
+  // 将 createElement 函数绑定到该实例上，该 vm 存在闭包中，不可修改，vm 实例则固定。这样我们就可以得到正确的上下文渲染
   vm._c = (a, b, c, d) => createElement(vm, a, b, c, d, false)
   // normalization is always applied for the public version, used in
   // user-written render functions.
   // @ts-expect-error
+  // 常规方法被用于公共版本，被用来作为用户界面的渲染方法
   vm.$createElement = (a, b, c, d) => createElement(vm, a, b, c, d, true)
 
   // $attrs & $listeners are exposed for easier HOC creation.

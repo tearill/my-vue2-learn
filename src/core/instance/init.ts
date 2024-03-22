@@ -30,6 +30,7 @@ export function initMixin(Vue: typeof Component) {
 
     // a flag to mark this as a Vue instance without having to do instanceof
     // check
+    // 一个防止 vm 实例自身被观察的标志位
     vm._isVue = true
     // avoid instances from being observed
     vm.__v_skip = true
@@ -92,6 +93,8 @@ export function initMixin(Vue: typeof Component) {
 
     /* istanbul ignore if */
     if (__DEV__ && config.performance && mark) {
+
+      // 格式化组件名
       vm._name = formatComponentName(vm, false)
       mark(endTag)
       measure(`vue ${vm._name} init`, startTag, endTag)
@@ -130,12 +133,22 @@ export function initInternalComponent(
 
 export function resolveConstructorOptions(Ctor: typeof Component) {
   let options = Ctor.options
+
+  // 如果存在父类的时候
   if (Ctor.super) {
+
+    // 对父类进行 resolveConstructorOptions，拿到父类的 options
     const superOptions = resolveConstructorOptions(Ctor.super)
+
+    // 之前已经缓存起来的父类的options
     const cachedSuperOptions = Ctor.superOptions
+
+    // 对比当前父类 options 和缓存的父类 options，检测是否更新
     if (superOptions !== cachedSuperOptions) {
       // super option changed,
       // need to resolve new options.
+      // 父类的 option 已经被改变，需要去处理新的 option
+      // 把新的 option 缓存起来，挂到 superOptions 上，方便下一次检测
       Ctor.superOptions = superOptions
       // check if there are any late-modified/attached options (#4976)
       const modifiedOptions = resolveModifiedOptions(Ctor)

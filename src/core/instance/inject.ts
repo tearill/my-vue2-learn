@@ -30,7 +30,10 @@ export function initProvide(vm: Component) {
 export function initInjections(vm: Component) {
   const result = resolveInject(vm.$options.inject, vm)
   if (result) {
+    // 标记不可 observe
     toggleObserving(false)
+
+    // 把 inject 的数据变成响应式
     Object.keys(result).forEach(key => {
       /* istanbul ignore else */
       if (__DEV__) {
@@ -46,6 +49,8 @@ export function initInjections(vm: Component) {
         defineReactive(vm, key, result[key])
       }
     })
+
+    // 标记 observe
     toggleObserving(true)
   }
 }

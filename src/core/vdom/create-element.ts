@@ -57,7 +57,7 @@ export function _createElement(
   normalizationType?: number
 ): VNode | Array<VNode> {
 
-  // data 已经是响应式的 => 返回创建一个空 VNode
+  // 如果data未定义（undefined或者null）|| data 已经是响应式的 => 返回创建一个空 VNode
   if (isDef(data) && isDef((data as any).__ob__)) {
     __DEV__ &&
       warn(
@@ -71,7 +71,7 @@ export function _createElement(
     return createEmptyVNode()
   }
   // object syntax in v-bind
-  // 取出动态指定的 component
+  // 取出元素的标签名称
   if (isDef(data) && isDef(data.is)) {
     tag = data.is
   }
@@ -134,7 +134,7 @@ export function _createElement(
         )
       }
 
-      // 如果是原生的标签，直接创建 VNode 节点就行
+      // 如果是原生的标签，直接创建标签对应的 VNode 节点就行
       vnode = new VNode(
         config.parsePlatformTagName(tag),
         data,
@@ -148,26 +148,34 @@ export function _createElement(
       isDef((Ctor = resolveAsset(context.$options, 'components', tag)))
     ) {
       // component
+      // 从 vm 实例的 option.components 中寻找该 tag，存在则就是一个组件，创建相应节点，Ctor 为组件的构造类
       vnode = createComponent(Ctor, data, context, children, tag)
     } else {
       // unknown or unlisted namespaced elements
       // check at runtime because it may get assigned a namespace when its
       // parent normalizes children
+      // 未知的元素，在运行时检查，因为父组件可能在序列化子组件的时候分配一个名字空间
       vnode = new VNode(tag, data, children, undefined, undefined, context)
     }
   } else {
 
-    // 如果 tag 给的是组件就通过 createComponent 方法创建一个组件 VNode
+    // tag 不是字符串的时候则是组件的构造类
     // direct component options / constructor
     vnode = createComponent(tag as any, data, context, children)
   }
+
+
   if (isArray(vnode)) {
     return vnode
   } else if (isDef(vnode)) {
+
+    // 如果有名字空间，则递归所有子节点应用该名字空间
     if (isDef(ns)) applyNS(vnode, ns)
     if (isDef(data)) registerDeepBindings(data)
     return vnode
   } else {
+
+    // 如果 vnode 没有成功创建则创建空节点
     return createEmptyVNode()
   }
 }

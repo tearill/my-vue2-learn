@@ -45,6 +45,7 @@ const mockDep = {
  * object's property keys into getter/setters that
  * collect dependencies and dispatch updates.
  */
+// 每个被观察到对象被附加上观察者实例，一旦被添加，观察者将为目标对象加上getter\setter属性，进行依赖收集以及调度更新
 export class Observer {
   dep: Dep
   vmCount: number // number of vms that have this object as root $data
@@ -125,6 +126,7 @@ export function observe(
 /**
  * Define a reactive property on an Object.
  */
+// 响应式核心方法
 export function defineReactive(
   obj: object,
   key: string,

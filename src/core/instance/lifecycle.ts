@@ -32,10 +32,13 @@ export function setActiveInstance(vm: Component) {
   }
 }
 
+// 初始化生命周期
 export function initLifecycle(vm: Component) {
   const options = vm.$options
 
   // locate first non-abstract parent
+  // 找到第一个不是抽象组件的父级组件
+  // 将 vm 对象存储到 parent 组件中（保证 parent 组件是非抽象组件，比如 keep-alive）
   let parent = options.parent
   if (parent && !options.abstract) {
     while (parent.$options.abstract && parent.$parent) {
@@ -50,6 +53,7 @@ export function initLifecycle(vm: Component) {
   vm.$children = []
   vm.$refs = {}
 
+  // 初始化组件生命周期的一些标识
   vm._provided = parent ? parent._provided : Object.create(null)
   vm._watcher = null
   vm._inactive = null
@@ -409,6 +413,7 @@ export function callHook(
       invokeWithErrorHandling(handlers[i], vm, args || null, vm, info)
     }
   }
+  // 这里是一个优化，通过 _hasHookEvent 来减少不必要的调用
   if (vm._hasHookEvent) {
     vm.$emit('hook:' + hook)
   }
