@@ -51,7 +51,7 @@ export function proxy(target: Object, sourceKey: string, key: string) {
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
 
-// 初始化props、methods、data、computed 与 watch
+// 初始化 props => methods => data => computed => watch
 export function initState(vm: Component) {
   const opts = vm.$options
 
@@ -87,18 +87,31 @@ function initProps(vm: Component, propsOptions: Object) {
   const props = (vm._props = shallowReactive({}))
   // cache prop keys so that future props updates can iterate using Array
   // instead of dynamic object key enumeration.
+  // 缓存属性的 key，使得将来能直接使用数组的索引值来更新 props 来替代动态地枚举对象
   const keys: string[] = (vm.$options._propKeys = [])
   const isRoot = !vm.$parent
   // root instance props should be converted
+  // 根据 $parent 是否存在来判断当前是否是根结点
   if (!isRoot) {
     toggleObserving(false)
   }
+
+  // 遍历 prop，对每一个 prop 进行处理
   for (const key in propsOptions) {
+
+    // props 的 key 值存入 keys（_propKeys）中
     keys.push(key)
+
+    // 验证 prop-数据校验
+    // 1. 不存在用默认值替换
+    // 2. 类型为 Boolean 则变成 true 或 false
+    // 当使用 default 中的默认值的时候会将默认值的副本进行 observe
     const value = validateProp(key, propsOptions, propsData, vm)
     /* istanbul ignore else */
     if (__DEV__) {
       const hyphenatedKey = hyphenate(key)
+
+      // 判断是否是保留字段，如果是则发出 warning
       if (
         isReservedAttribute(hyphenatedKey) ||
         config.isReservedAttr(hyphenatedKey)

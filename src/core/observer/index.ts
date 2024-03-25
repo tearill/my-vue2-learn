@@ -54,7 +54,11 @@ export class Observer {
     // this.value = value
     this.dep = mock ? mockDep : new Dep()
     this.vmCount = 0
+
+    // 给对应的值上挂载一个 __ob__，避免多次创建
     def(value, '__ob__', this)
+
+    // 如果是对象
     if (isArray(value)) {
       if (!mock) {
         if (hasProto) {
@@ -62,12 +66,16 @@ export class Observer {
           ;(value as any).__proto__ = arrayMethods
           /* eslint-enable no-proto */
         } else {
+
+          // 重写原型方法
           for (let i = 0, l = arrayKeys.length; i < l; i++) {
             const key = arrayKeys[i]
             def(value, key, arrayMethods[key])
           }
         }
       }
+
+      // 深层监听
       if (!shallow) {
         this.observeArray(value)
       }
@@ -78,6 +86,7 @@ export class Observer {
        * value type is Object.
        */
       const keys = Object.keys(value)
+      // 遍历所有属性，给对象的每一个属性都创建一个 getter/setter
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i]
         defineReactive(value, key, NO_INITIAL_VALUE, undefined, shallow, mock)
@@ -88,6 +97,7 @@ export class Observer {
   /**
    * Observe a list of Array items.
    */
+  // 监听数组的每一项变更
   observeArray(value: any[]) {
     for (let i = 0, l = value.length; i < l; i++) {
       observe(value[i], false, this.mock)
@@ -102,14 +112,22 @@ export class Observer {
  * returns the new observer if successfully observed,
  * or the existing observer if the value already has one.
  */
+// 给一个 value 创建一个 Observer
+// 返回创建的 Observer 或者是当前 value 已有的 Observer
+// （也就是每个 value 对应的 Observer 只有一个，是单例模式的）
 export function observe(
   value: any,
   shallow?: boolean,
   ssrMockReactivity?: boolean
 ): Observer | void {
+
+  // 通过 __ob__ 属性判断是否已经有 Observer 实例
+  // 如果已经有了，直接返回
   if (value && hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     return value.__ob__
   }
+  // 如果需要 observe 才会创建 Observer，避免重复对一个 value 进行 observe
+  // 这里的判断是为了确保 value 是单纯的对象，而不是函数或者是 Regexp 等情况
   if (
     shouldObserve &&
     (ssrMockReactivity || !isServerRendering()) &&
@@ -126,7 +144,9 @@ export function observe(
 /**
  * Define a reactive property on an Object.
  */
-// 响应式核心方法
+// 响应式核心方法(发布-订阅模式)
+// 通过 defineProperty 为对象加上 Dep(订阅者)
+// 在发生变化的时候通过 Dep 发布变化 => Watcher(观察者)
 export function defineReactive(
   obj: object,
   key: string,
