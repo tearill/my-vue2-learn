@@ -40,7 +40,7 @@ const sharedPropertyDefinition = {
 }
 
 // 通过 proxy 函数将 _data（或者 _props 等）上面的数据代理到 vm 上
-// 这样就可以用 app.text 代替 app._data.text 了
+// 这样就可以用 vm.text 代替 vm._data.text 了
 export function proxy(target: Object, sourceKey: string, key: string) {
   sharedPropertyDefinition.get = function proxyGetter() {
     return this[sourceKey][key]
@@ -93,6 +93,8 @@ function initProps(vm: Component, propsOptions: Object) {
   // root instance props should be converted
   // 根据 $parent 是否存在来判断当前是否是根结点
   if (!isRoot) {
+
+    // 不是根节点的时候，不进行监听
     toggleObserving(false)
   }
 
@@ -144,6 +146,8 @@ function initProps(vm: Component, propsOptions: Object) {
     // static props are already proxied on the component's prototype
     // during Vue.extend(). We only need to proxy props defined at
     // instantiation here.
+    // 把所有的 prop 代理到 vm._props 上
+    // 这样就可以通过 vm.[key] 来直接取值
     if (!(key in vm)) {
       proxy(vm, `_props`, key)
     }
@@ -309,9 +313,15 @@ function createGetterInvoker(fn) {
 }
 
 function initMethods(vm: Component, methods: Object) {
+
+  // 拿到所有的 props
   const props = vm.$options.props
+
+  // 遍历所有的 methods 方法
   for (const key in methods) {
     if (__DEV__) {
+
+      // 如果不是函数
       if (typeof methods[key] !== 'function') {
         warn(
           `Method "${key}" has type "${typeof methods[
@@ -321,9 +331,13 @@ function initMethods(vm: Component, methods: Object) {
           vm
         )
       }
+
+      // methods 和 props 中的参数名称重复
       if (props && hasOwn(props, key)) {
         warn(`Method "${key}" has already been defined as a prop.`, vm)
       }
+
+      // 和 Vue 的保留关键字冲突
       if (key in vm && isReserved(key)) {
         warn(
           `Method "${key}" conflicts with an existing Vue instance method. ` +
@@ -331,6 +345,10 @@ function initMethods(vm: Component, methods: Object) {
         )
       }
     }
+
+    // 如果不是函数，把对应 method 改成一个空函数
+    // 如果是一个函数，将 this 上下文通过 bind 方法替换成 vm
+    // method 最终也会挂载到 vm 实例上
     vm[key] = typeof methods[key] !== 'function' ? noop : bind(methods[key], vm)
   }
 }

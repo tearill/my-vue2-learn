@@ -17,6 +17,7 @@ export function isReserved(str: string): boolean {
 /**
  * Define a property.
  */
+// 定义一个属性
 export function def(obj: Object, key: string, val: any, enumerable?: boolean) {
   Object.defineProperty(obj, key, {
     value: val,
@@ -29,6 +30,7 @@ export function def(obj: Object, key: string, val: any, enumerable?: boolean) {
 /**
  * Parse simple path.
  */
+// 按路径取值，类似 lodash.get()
 const bailRE = new RegExp(`[^${unicodeRegExp.source}.$_\\d]`)
 export function parsePath(path: string): any {
   if (bailRE.test(path)) {

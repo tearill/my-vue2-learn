@@ -29,6 +29,10 @@ export interface DepTarget extends DebuggerOptions {
  * @internal
  */
 export default class Dep {
+
+  // 全局唯一的 Watcher
+  // 同一时间只能有一个全局的 Watcher 被计算
+  // target 表明当前正在计算的 Watcher
   static target?: DepTarget | null
   id: number
   subs: Array<DepTarget | null>
@@ -36,14 +40,22 @@ export default class Dep {
   _pending = false
 
   constructor() {
+
+    // 自增的 id，每次 new Dep 都不一样
+    // 保证每个数据对应的 Dep 是独立的
     this.id = uid++
+
+    // 所有的依赖篮子
+    // 也就是所有的 Watcher
     this.subs = []
   }
 
+  // 添加一个依赖
   addSub(sub: DepTarget) {
     this.subs.push(sub)
   }
 
+  // 移除一个依赖
   removeSub(sub: DepTarget) {
     // #12696 deps with massive amount of subscribers are extremely slow to
     // clean up in Chromium
@@ -56,8 +68,12 @@ export default class Dep {
     }
   }
 
+  // 依赖收集，当存在 Dep.target 的时候添加
   depend(info?: DebuggerEventExtraInfo) {
     if (Dep.target) {
+
+      // 调用 watcher 的 addDep
+      // 会经过一系列判断，最终调用 Dep 的 addSub，把 Watcher 加到依赖篮子里
       Dep.target.addDep(this)
       if (__DEV__ && info && Dep.target.onTrack) {
         Dep.target.onTrack({
@@ -68,8 +84,10 @@ export default class Dep {
     }
   }
 
+  // 通知所有订阅者（Watcher）进行更新
   notify(info?: DebuggerEventExtraInfo) {
     // stabilize the subscriber list first
+    // 确保所有的依赖都是存在的
     const subs = this.subs.filter(s => s) as DepTarget[]
     if (__DEV__ && !config.async) {
       // subs aren't sorted in scheduler if not running async
@@ -86,6 +104,8 @@ export default class Dep {
             ...info
           })
       }
+
+      // 调用 update 方法，重新渲染
       sub.update()
     }
   }
@@ -94,14 +114,17 @@ export default class Dep {
 // The current target watcher being evaluated.
 // This is globally unique because only one watcher
 // can be evaluated at a time.
+// 依赖收集完需要将 Dep.target 设为 null，防止后面重复添加依赖
 Dep.target = null
 const targetStack: Array<DepTarget | null | undefined> = []
 
+// 将 watcher 观察者实例设置给 Dep.target，用以依赖收集。同时将该实例存入 target 栈中
 export function pushTarget(target?: DepTarget | null) {
   targetStack.push(target)
   Dep.target = target
 }
 
+// 将观察者实例从 target 栈中取出并设置给 Dep.target
 export function popTarget() {
   targetStack.pop()
   Dep.target = targetStack[targetStack.length - 1]

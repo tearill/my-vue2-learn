@@ -149,6 +149,13 @@ export default class Watcher implements DepTarget {
         traverse(value)
       }
       popTarget()
+
+      // 每次 get 之后需要遍历 deps，移除对 deps.subs 数组中 Watcher 的订阅
+      // 考虑根据 v-if 条件渲染不同的模板 a 和 b
+      // 当满足某个条件的时候渲染 a，会去访问到 a 中的数据
+      // 如果对 a 使用的数据添加了 getter 并进行了依赖收集，当修改 a 的时候会通知订阅者更新
+      // 如果事件改变了条件需要渲染 b 的时候，就会对 b 使用的数据添加 getter 和依赖收集
+      // 如果不进行依赖的移除，如果这时修改 a 模板的数据，就会通知 a 数据订阅的回调，重新进行 render，对于性能是一种浪费
       this.cleanupDeps()
     }
     return value
@@ -157,11 +164,14 @@ export default class Watcher implements DepTarget {
   /**
    * Add a dependency to this directive.
    */
+  // 添加一个依赖关系到 Deps 集合中
   addDep(dep: Dep) {
     const id = dep.id
     if (!this.newDepIds.has(id)) {
       this.newDepIds.add(id)
       this.newDeps.push(dep)
+
+      // 把 watcher 加到依赖篮子里
       if (!this.depIds.has(id)) {
         dep.addSub(this)
       }

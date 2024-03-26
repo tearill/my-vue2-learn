@@ -156,14 +156,18 @@ export function defineReactive(
   mock?: boolean,
   observeEvenIfShallow = false
 ) {
+  // 依赖收集
   const dep = new Dep()
 
+  // 不可配置的属性不处理
   const property = Object.getOwnPropertyDescriptor(obj, key)
   if (property && property.configurable === false) {
     return
   }
 
   // cater for pre-defined getter/setters
+  // 如果之前该对象已经预设了 getter 以及 setter 函数则将其取出来
+  // 新定义的 getter/setter 中会将其执行，保证不会覆盖之前已经定义的 getter/setter
   const getter = property && property.get
   const setter = property && property.set
   if (
@@ -173,24 +177,41 @@ export function defineReactive(
     val = obj[key]
   }
 
+  // 是否是浅层监听
+  // 其实这里就是递归调用 observe => defineReactive，对子对象进行监听
   let childOb = shallow ? val && val.__ob__ : observe(val, false, mock)
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
     get: function reactiveGetter() {
+
+      // 如果对应的对象上原本就拥有 getter，这里也会执行一次，保证不覆盖
       const value = getter ? getter.call(obj) : val
+
+      // 开始计算(render，模板解析)的时候才会执行到这里
+      // Dep.target 初始是 null
+      // Dep.target 是当前的 Watcher，是一个 render 函数
       if (Dep.target) {
         if (__DEV__) {
+
+          // 添加依赖，也就是依赖收集，把当前 Watcher 加到依赖篮子里
+          // 当前 Watcher 也就是触发 get 的对象，就是一个 render 函数
           dep.depend({
             target: obj,
             type: TrackOpTypes.GET,
             key
           })
         } else {
+
+          // 添加依赖，也就是依赖收集
           dep.depend()
         }
         if (childOb) {
+
+          // 子对象进行依赖收集
           childOb.dep.depend()
+
+          // 如果是数组，对每一个数组成员都进行依赖收集
           if (isArray(value)) {
             dependArray(value)
           }
@@ -199,13 +220,18 @@ export function defineReactive(
       return isRef(value) && !shallow ? value.value : value
     },
     set: function reactiveSetter(newVal) {
+      // 先拿到原始值
       const value = getter ? getter.call(obj) : val
+
+      // 对比原始值和需要 set 的值，观察数据是否改变，如果没有改变的话不触发任何操作
       if (!hasChanged(value, newVal)) {
         return
       }
       if (__DEV__ && customSetter) {
         customSetter()
       }
+
+      // 调用 setter 计算新的值
       if (setter) {
         setter.call(obj, newVal)
       } else if (getter) {
@@ -215,9 +241,16 @@ export function defineReactive(
         value.value = newVal
         return
       } else {
+
+        // 如果值不同就把旧值替换成 newVal
         val = newVal
       }
+
+      // 如果新值是一个对象，调用 observe 使其变成响应式对象
       childOb = shallow ? newVal && newVal.__ob__ : observe(newVal, false, mock)
+
+      // 通过 dep.notify() 通知所有的订阅者
+      // 遍历所有的 subs[] => Watcher，调用它们的 update 方法
       if (__DEV__) {
         dep.notify({
           type: TriggerOpTypes.SET,
@@ -348,12 +381,17 @@ export function del(target: any[] | object, key: any) {
  * Collect dependencies on array elements when the array is touched, since
  * we cannot intercept array element access like property getters.
  */
+// 对数组每一个元素进行依赖收集
 function dependArray(value: Array<any>) {
   for (let e, i = 0, l = value.length; i < l; i++) {
     e = value[i]
+
+    // 通过对象上的 observer 进行依赖收集
     if (e && e.__ob__) {
       e.__ob__.dep.depend()
     }
+
+    // 如果存在嵌套数组，继续递归监听
     if (isArray(e)) {
       dependArray(e)
     }
