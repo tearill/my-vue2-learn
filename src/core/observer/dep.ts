@@ -86,6 +86,7 @@ export default class Dep {
   }
 
   // 通知所有订阅者（Watcher）进行更新
+  // 通知所有的依赖们，都进行更新（通知所有的 Watcher）
   notify(info?: DebuggerEventExtraInfo) {
     // stabilize the subscriber list first
     // 确保所有的依赖都是存在的

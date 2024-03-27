@@ -361,7 +361,7 @@ export function defineComputed(
 }
 
 // 创建 computed 属性的 getter 函数
-// 更新过程
+// 更新过程: 数据变更 -> computedWatcher -> 渲染watcher -> 更新视图
 // 当 dirty 为 true，调用 watcher.evaluate() =>
 // 进入 this.get() 方法 => 在读取模板变量的时候，全局的 Dep.target 是 渲染watcher
 // 此时的 Dep.target 是 渲染watcher，targetStack 是 [渲染watcher]
@@ -393,6 +393,7 @@ function createComputedGetter(key) {
         watcher.evaluate()
       }
 
+      // 如果有，那就代表还有 渲染watcher
       // 此时的 Dep.target 为 渲染watcher，所以进入了 watcher.depend()
       if (Dep.target) {
         if (__DEV__ && Dep.target.onTrack) {
@@ -405,6 +406,8 @@ function createComputedGetter(key) {
         }
 
         // 依赖收集，也就是让 computed 依赖的属性进行依赖收集，收集渲染 Watcher
+        // 先让 computedWatcher 收集 渲染watcher 作为自己的依赖
+        // 然后让 watcher 里面的 deps 都收集 渲染watcher
 
         // 此时的 Dep.target 为 renderWatcher，所以进入了 Watcher.depend()
         // watcher.depend() 方法中会触发所有的依赖属性的 deps.depend()
@@ -412,7 +415,7 @@ function createComputedGetter(key) {
         // => 让依赖属性的 Dep 的依赖篮子(subs)里中持有 renderWatcher(让每个属性知道自己依赖了 renderWatcher)
 
         // 在经过上面的 evaluate 之后，依赖属性的 dep 的 subs 依赖篮子里已经有 computedWatcher 了
-        // 此时依赖属性的 dep 的 subs 依赖篮子为：[computed 属性的 计算watcher, 渲染watcher]
+        // 此时每一个依赖属性的 dep 的 subs 依赖篮子为：[computed 属性的 计算watcher, 渲染watcher]
 
         // 此时依赖属性更新了，将会引起 computed 属性的更新，在依赖属性的 setter 中会触发依赖属性的 dep 的 notify
         // 此时会将依赖属性的 subs 中持有的 Watcher 依次取出来调用它们的 update 方法，也就是
@@ -422,7 +425,7 @@ function createComputedGetter(key) {
         // 这个时候就触发 computedWatcher 的 update，将 dirty 设为 true，惰性求值，等待下次读取的时候进行更新
         // (这个时候还没求值)
         // 然后再触发 renderWatcher 的 update => 访问到 computed 值 => 触发 computed getter
-        // (转了一圈，收集了各个依赖，拿到各个依赖的值，然后又回来这里了)
+        // (转了一圈，收集了各个依赖，拿到各个依赖的值，然后又回来这里了，这个时候才是真正的求值)
 
         // 在 计算watcher 的 update 过程中已经把 dirty 设为 true 了
         // 所以这里会去调用 evaluate(里面又把 dirty 改回 false 了) 根据传入的函数重新求值，页面上也就显示了最新的值

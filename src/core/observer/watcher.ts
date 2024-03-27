@@ -143,6 +143,7 @@ export default class Watcher implements DepTarget {
           )
       }
     }
+    // computedWatcher 在首次进来的时候不会调用 get 求值
     this.value = this.lazy ? undefined : this.get()
   }
 
