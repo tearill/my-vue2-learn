@@ -177,6 +177,7 @@ export function cached<R>(fn: (str: string) => R): (sr: string) => R {
 /**
  * Camelize a hyphen-delimited string.
  */
+// 变成驼峰命名
 const camelizeRE = /-(\w)/g
 export const camelize = cached((str: string): string => {
   return str.replace(camelizeRE, (_, c) => (c ? c.toUpperCase() : ''))
@@ -185,6 +186,7 @@ export const camelize = cached((str: string): string => {
 /**
  * Capitalize a string.
  */
+// 变成大驼峰命名
 export const capitalize = cached((str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1)
 })
@@ -245,6 +247,7 @@ export function toArray(list: any, start?: number): Array<any> {
 /**
  * Mix properties into target object.
  */
+// 把属性加到目标对象中，类似于 Object.assign
 export function extend(
   to: Record<PropertyKey, any>,
   _from?: Record<PropertyKey, any>

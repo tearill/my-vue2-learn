@@ -320,16 +320,43 @@ export function validateComponentName(name: string) {
  * Ensure all props option syntax are normalized into the
  * Object-based format.
  */
+// 对 props 做规范化处理
+// 因为 props 在使用的时候可以写成数组的格式
+// 举例：
+// 1. props 是数组：props: ['name', 'nick-name']
+// 会被规范成：
+// options.props = {
+//   name: { type: null },
+//   nickName: { type: null }
+// }
+// 2. props 是对象
+// props: {
+//   name: String,
+//   nickName: {
+//     type: Boolean
+//   }
+// }
+// 会被规范成：
+// options.props = {
+//   name: { type: String },
+//   nickName: { type: Boolean }
+// }
 function normalizeProps(options: Record<string, any>, vm?: Component | null) {
   const props = options.props
   if (!props) return
   const res: Record<string, any> = {}
   let i, val, name
+
+  // 如果是数组
   if (isArray(props)) {
     i = props.length
     while (i--) {
       val = props[i]
+
+      // 数组里的每一项必须是字符串
       if (typeof val === 'string') {
+
+        // 变成驼峰命名
         name = camelize(val)
         res[name] = { type: null }
       } else if (__DEV__) {
@@ -337,9 +364,15 @@ function normalizeProps(options: Record<string, any>, vm?: Component | null) {
       }
     }
   } else if (isPlainObject(props)) {
+
+    // 如果是对象
     for (const key in props) {
       val = props[key]
+
+      // 变成驼峰命名
       name = camelize(key)
+
+      // 如果 value 不是对象，规范成一个对象
       res[name] = isPlainObject(val) ? val : { type: val }
     }
   } else if (__DEV__) {
@@ -349,23 +382,35 @@ function normalizeProps(options: Record<string, any>, vm?: Component | null) {
       vm
     )
   }
+
+  // 把处理好的最新内容挂回去
   options.props = res
 }
 
 /**
  * Normalize all injections into Object-based format
  */
+// 规范化 inject 的数据，转换成对象
 function normalizeInject(options: Record<string, any>, vm?: Component | null) {
   const inject = options.inject
   if (!inject) return
   const normalized: Record<string, any> = (options.inject = {})
+
+  // 如果是数组
   if (isArray(inject)) {
+
+    // 遍历数组，每一项变成对象
     for (let i = 0; i < inject.length; i++) {
       normalized[inject[i]] = { from: inject[i] }
     }
   } else if (isPlainObject(inject)) {
+
+    // 如果是对象
     for (const key in inject) {
       const val = inject[key]
+
+      // 如果 value 是对象，把 value 挂到转换之后的对象上
+      // {from: key, val}
       normalized[key] = isPlainObject(val)
         ? extend({ from: key }, val)
         : { from: val }
@@ -382,11 +427,16 @@ function normalizeInject(options: Record<string, any>, vm?: Component | null) {
 /**
  * Normalize raw function directives into object format.
  */
+// 规范化指令
 function normalizeDirectives(options: Record<string, any>) {
   const dirs = options.directives
   if (dirs) {
+
+    // 遍历所有的指令
     for (const key in dirs) {
       const def = dirs[key]
+
+      // 把指令变成对象，里面有 bind 和 update 属性
       if (isFunction(def)) {
         dirs[key] = { bind: def, update: def }
       }
@@ -394,6 +444,7 @@ function normalizeDirectives(options: Record<string, any>) {
   }
 }
 
+// 断言是否是对象
 function assertObjectType(name: string, value: any, vm: Component | null) {
   if (!isPlainObject(value)) {
     warn(
@@ -422,6 +473,8 @@ export function mergeOptions(
     child = child.options
   }
 
+  // 规范化 props，因为 props 在使用的时候可以声明成数组
+  // 需要把这种格式的转换成对象
   normalizeProps(child, vm)
   normalizeInject(child, vm)
   normalizeDirectives(child)

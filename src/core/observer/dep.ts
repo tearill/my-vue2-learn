@@ -74,6 +74,7 @@ export default class Dep {
 
       // 调用 watcher 的 addDep
       // 会经过一系列判断，最终调用 Dep 的 addSub，把 Watcher 加到依赖篮子里
+      // 这是一个相互关联的过程，让 Watcher 知道自己依赖了它
       Dep.target.addDep(this)
       if (__DEV__ && info && Dep.target.onTrack) {
         Dep.target.onTrack({
@@ -106,6 +107,7 @@ export default class Dep {
       }
 
       // 调用 update 方法，重新渲染
+      // 这个 update 方法是 Watcher 的
       sub.update()
     }
   }

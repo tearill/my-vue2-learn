@@ -33,6 +33,7 @@ if (inBrowser) {
 
 // this needs to be lazy-evaled because vue may be required before
 // vue-server-renderer can set VUE_ENV
+// 是否是服务端渲染
 let _isServer
 export const isServerRendering = () => {
   if (_isServer === undefined) {

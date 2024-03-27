@@ -49,6 +49,8 @@ export function initMixin(Vue: typeof Component) {
       // internal component options needs special treatment.
       initInternalComponent(vm, options as any)
     } else {
+
+      // 里面会有规范化的过程
       vm.$options = mergeOptions(
         resolveConstructorOptions(vm.constructor as any),
         options || {},

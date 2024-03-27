@@ -68,6 +68,7 @@ export function initState(vm: Component) {
   if (opts.data) {
     initData(vm)
   } else {
+
     // 组件没有 data 的时候绑定一个空对象
     const ob = observe((vm._data = {}))
     ob && ob.vmCount++
@@ -147,7 +148,7 @@ function initProps(vm: Component, propsOptions: Object) {
     // during Vue.extend(). We only need to proxy props defined at
     // instantiation here.
     // 把所有的 prop 代理到 vm._props 上
-    // 这样就可以通过 vm.[key] 来直接取值
+    // 这样就可以通过 vm.[key] 来直接取值，vm._props.a => vm.a
     if (!(key in vm)) {
       proxy(vm, `_props`, key)
     }
@@ -155,9 +156,18 @@ function initProps(vm: Component, propsOptions: Object) {
   toggleObserving(true)
 }
 
+// 初始化 data
 function initData(vm: Component) {
+  // 拿到所有的 data 数据
   let data: any = vm.$options.data
+
+  // 判断传入的是否是函数，data 默认是一个空对象
+  // 如果是函数，调用方法返回一个 data
+  // 不是函数，直接使用 data
   data = vm._data = isFunction(data) ? getData(data, vm) : data || {}
+
+  // 如果不是一个对象（严格对象，Array 和 Function 不算）
+  // 限制 data 一定是一个对象，使用 Vue 的时候需要保证 data 一定 return 一个对象
   if (!isPlainObject(data)) {
     data = {}
     __DEV__ &&
@@ -168,17 +178,24 @@ function initData(vm: Component) {
       )
   }
   // proxy data on instance
+  // 和 props、methods 的操作一样，把对应的值都挂到 vm 这个实例上
   const keys = Object.keys(data)
   const props = vm.$options.props
   const methods = vm.$options.methods
   let i = keys.length
+
+  // 拿到 data 的 key 和 props、methods 进行循环对比，防止重名覆盖，因为最后都会挂载到 vm 实例上
   while (i--) {
     const key = keys[i]
     if (__DEV__) {
+
+      // 在 methods 里面
       if (methods && hasOwn(methods, key)) {
         warn(`Method "${key}" has already been defined as a data property.`, vm)
       }
     }
+
+    // 在 props 里面
     if (props && hasOwn(props, key)) {
       __DEV__ &&
         warn(
@@ -187,10 +204,13 @@ function initData(vm: Component) {
           vm
         )
     } else if (!isReserved(key)) {
+      // 不是保留 key 的时候，把 data 里面的值全部代理到 vm 上
+      // vm._data.a => vm.a
       proxy(vm, `_data`, key)
     }
   }
   // observe data
+  // 这里把 data 变成响应式的
   const ob = observe(data)
   ob && ob.vmCount++
 }
@@ -199,6 +219,8 @@ export function getData(data: Function, vm: Component): any {
   // #7573 disable dep collection when invoking data getters
   pushTarget()
   try {
+
+    // 调用方法返回一个 data
     return data.call(vm, vm)
   } catch (e: any) {
     handleError(e, vm, `data()`)
@@ -210,25 +232,42 @@ export function getData(data: Function, vm: Component): any {
 
 const computedWatcherOptions = { lazy: true }
 
+// 初始化 computed
 function initComputed(vm: Component, computed: Object) {
   // $flow-disable-line
+  // 创建 computedWatchers 集合
   const watchers = (vm._computedWatchers = Object.create(null))
   // computed properties are just getters during SSR
+  // 提前判断是否是 SSR，SSR 的时候不需要创建 computedWatcher
+  // computed 不在 SSR 的时候执行
   const isSSR = isServerRendering()
 
+  // 遍历所有的 computed
   for (const key in computed) {
+
+    // 获取 computed 属性对应的值
     const userDef = computed[key]
+
+    // 计算属性可以直接是一个 function，也可以设置 get 以及 set 方法
+    // 如果是函数，computed 属性对应的值就是一个 getter 函数
+    // docs: https://v2.cn.vuejs.org/v2/guide/computed.html#%E8%AE%A1%E7%AE%97%E5%B1%9E%E6%80%A7%E7%9A%84-setter
     const getter = isFunction(userDef) ? userDef : userDef.get
     if (__DEV__ && getter == null) {
       warn(`Getter is missing for computed property "${key}".`, vm)
     }
 
+    // 非 SSR 场景下创建 computedWatcher
     if (!isSSR) {
       // create internal watcher for the computed property.
+      // computed 也通过 Watcher 实现，每一个 key(也就是 computed 属性)对应一个 computedWatcher
+      // computedWatcher 在 set 的时候会收集渲染 Watcher 作为它的响应式依赖
       watchers[key] = new Watcher(
         vm,
         getter || noop,
         noop,
+
+        // options 配置，这里传入了 lazy: true
+        // 标识是惰性计算（带缓存）
         computedWatcherOptions
       )
     }
@@ -236,9 +275,17 @@ function initComputed(vm: Component, computed: Object) {
     // component-defined computed properties are already defined on the
     // component prototype. We only need to define computed properties defined
     // at instantiation here.
+    // computed 属性在 vm 上，是全局共享的，只处理 vm 上没有的
+    // 组件已经在原型上定义了一些计算属性，只有在实例化组件时才需要再定义一些额外的计算属性
+    // 比如一个 User 组件有一个 computed fullName
+    // ExtendedUser 继承了 User，如果 ExtendedUser 里面定义了一个 computed fullName，不绕开的话就会覆盖 User 上的 computed fullName
+    // 所以每个组件初始化的时候，没有必要重复初始化 fullName 属性
     if (!(key in vm)) {
+
+      // 定义计算属性
       defineComputed(vm, key, userDef)
     } else if (__DEV__) {
+      // 如果 computed 里面的属性和 data、props、methods 里面的值重复时进行提示
       if (key in vm.$data) {
         warn(`The computed property "${key}" is already defined in data.`, vm)
       } else if (vm.$options.props && key in vm.$options.props) {
@@ -253,23 +300,53 @@ function initComputed(vm: Component, computed: Object) {
   }
 }
 
+// 定义计算属性
 export function defineComputed(
   target: any,
   key: string,
   userDef: Record<string, any> | (() => any)
 ) {
+
+  // 是否应该缓存
+  // 在非服务端渲染的情况下会进行缓存
   const shouldCache = !isServerRendering()
+
+  // 下面是在构建每一个 computed 属性的 get 和 set，方便在 defineProperty 拦截到操作的时候调用
+  // 如果传递的是函数
+  // computed: {
+  //   fullName: function() {}
+  // }
   if (isFunction(userDef)) {
+
+    // get 赋值为传入的函数
+    // 1. 需要缓存，使用 createComputedGetter
+    // 2. 不需要缓存，使用 createGetterInvoker
     sharedPropertyDefinition.get = shouldCache
       ? createComputedGetter(key)
       : createGetterInvoker(userDef)
+
+    // setter 赋值为空函数
     sharedPropertyDefinition.set = noop
   } else {
+
+    // computed 传入的是一个对象
+    // computed: {
+    //   fullName: {
+    //     get: () => {},
+    //     set: () => {}
+    //   }
+    // }
+    // 1. get 不存在则直接给空函数
+    // 2. 如果存在则查看是否有缓存
+    //    - 有缓存，使用 createComputedGetter 创建
+    //    - 没有缓存，赋值 get 为传入 get 属性对应的值
     sharedPropertyDefinition.get = userDef.get
       ? shouldCache && userDef.cache !== false
         ? createComputedGetter(key)
         : createGetterInvoker(userDef.get)
       : noop
+
+    // setter 赋值为传入 set 属性对应的值
     sharedPropertyDefinition.set = userDef.set || noop
   }
   if (__DEV__ && sharedPropertyDefinition.set === noop) {
@@ -283,13 +360,40 @@ export function defineComputed(
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
 
+// 创建 computed 属性的 getter 函数
+// 更新过程
+// 当 dirty 为 true，调用 watcher.evaluate() =>
+// 进入 this.get() 方法 => 在读取模板变量的时候，全局的 Dep.target 是 渲染watcher
+// 此时的 Dep.target 是 渲染watcher，targetStack 是 [渲染watcher]
+// 然后触发 computed 属性的 getter
 function createComputedGetter(key) {
+
+  // 返回一个 getter 函数
   return function computedGetter() {
+
+    // 拿到当前对应的 computedWatcher（观察者）
     const watcher = this._computedWatchers && this._computedWatchers[key]
     if (watcher) {
+
+      // 脏值检查，在 computed 属性发生变更的时候，dirty 会变成 true，以便在 get 的时候重新计算新的值
+      // 如果 dirty 是 true，说明计算的值是脏的，需要重新计算和缓存
+      // 第一次在模板中读取到数据(render)的时候它一定是 true，所以初始化就会经历一次求值
+      // => 调用 evaluate 方法（为什么是 true，因为 new Watcher 的时候传入了 lazy: true）
       if (watcher.dirty) {
+
+        // 这里就是在重新求值
+        // 触发 get，然后执行自己的 get(传入的 computed 属性的 function)
+        // evaluate => computedWatcher get => pushTarget(computedWatcher)
+        // => 执行传入的 computed getFunc，尝试计算值 => 读取到了依赖的属性，触发依赖属性 getter
+        // => 触发依赖属性 dep.depend => 把 Dep 加到了 Watcher 的 deps 篮子里(让 Watcher 知道谁依赖了自己)
+        // => 触发 Watcher.addDep，把 Watcher 加到依赖属性的依赖篮子(subs)里，让依赖属性订阅 Watcher(让每个属性知道自己依赖谁)
+        // (也就是 computed 属性的 Watcher 和它所依赖的响应式值的 dep 相互保留了彼此)
+        // => get 结束 popTarget
+        // targetStack 是 [渲染watcher]
         watcher.evaluate()
       }
+
+      // 此时的 Dep.target 为 渲染watcher，所以进入了 watcher.depend()
       if (Dep.target) {
         if (__DEV__ && Dep.target.onTrack) {
           Dep.target.onTrack({
@@ -299,6 +403,29 @@ function createComputedGetter(key) {
             key
           })
         }
+
+        // 依赖收集，也就是让 computed 依赖的属性进行依赖收集，收集渲染 Watcher
+
+        // 此时的 Dep.target 为 renderWatcher，所以进入了 Watcher.depend()
+        // watcher.depend() 方法中会触发所有的依赖属性的 deps.depend()
+        // => 把 Dep 加到了 renderWatcher 的 deps 篮子里(让渲染 Watcher 知道谁依赖了自己)
+        // => 让依赖属性的 Dep 的依赖篮子(subs)里中持有 renderWatcher(让每个属性知道自己依赖了 renderWatcher)
+
+        // 在经过上面的 evaluate 之后，依赖属性的 dep 的 subs 依赖篮子里已经有 computedWatcher 了
+        // 此时依赖属性的 dep 的 subs 依赖篮子为：[computed 属性的 计算watcher, 渲染watcher]
+
+        // 此时依赖属性更新了，将会引起 computed 属性的更新，在依赖属性的 setter 中会触发依赖属性的 dep 的 notify
+        // 此时会将依赖属性的 subs 中持有的 Watcher 依次取出来调用它们的 update 方法，也就是
+        // 1. 计算watcher 的 update
+        // 2. 渲染watcher 的 update
+
+        // 这个时候就触发 computedWatcher 的 update，将 dirty 设为 true，惰性求值，等待下次读取的时候进行更新
+        // (这个时候还没求值)
+        // 然后再触发 renderWatcher 的 update => 访问到 computed 值 => 触发 computed getter
+        // (转了一圈，收集了各个依赖，拿到各个依赖的值，然后又回来这里了)
+
+        // 在 计算watcher 的 update 过程中已经把 dirty 设为 true 了
+        // 所以这里会去调用 evaluate(里面又把 dirty 改回 false 了) 根据传入的函数重新求值，页面上也就显示了最新的值
         watcher.depend()
       }
       return watcher.value
