@@ -319,8 +319,8 @@ export function defineComputed(
   if (isFunction(userDef)) {
 
     // get 赋值为传入的函数
-    // 1. 需要缓存，使用 createComputedGetter
-    // 2. 不需要缓存，使用 createGetterInvoker
+    // 1. 需要缓存，使用 createComputedGetter，创建统一的 getter
+    // 2. 不需要缓存，使用 createGetterInvoker，直接调用传入的 function
     sharedPropertyDefinition.get = shouldCache
       ? createComputedGetter(key)
       : createGetterInvoker(userDef)
@@ -338,7 +338,7 @@ export function defineComputed(
     // }
     // 1. get 不存在则直接给空函数
     // 2. 如果存在则查看是否有缓存
-    //    - 有缓存，使用 createComputedGetter 创建
+    //    - 有缓存，使用 createComputedGetter 创建统一的 getter
     //    - 没有缓存，赋值 get 为传入 get 属性对应的值
     sharedPropertyDefinition.get = userDef.get
       ? shouldCache && userDef.cache !== false
@@ -359,6 +359,42 @@ export function defineComputed(
   }
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
+
+// 我比较蠢，为了方便自己理解，这里再收敛一下
+// computed 属性计算的场景分为两种
+// 1. 初始化(首次解析模板进行 render)
+// 2. 依赖的数据变更触发 computed 更新
+
+// 第一种：初始化
+// 初始化执行 initComputed => new Watcher({lazy: true}) => 初始化的时候只是赋值 lazy(表示惰性计算)，并不会执行 computed 计算
+// => defineComputed，构建每一个 computed 属性的 get 和 set，方便在 defineProperty 拦截到操作的时候调用
+
+// 开始 render => 读取到 computed 属性，触发 getter => dirty 是 true，调用 evaluate() 求值
+// => pushTarget[renderWatcher, computedWatcher]
+// => 调用 computed 传入的函数进行求值 => 读取到了依赖的属性，触发依赖属性的 getter => dep.depend() => target.addDep
+// 首先：target.addDep => dep.addSub，让 computedWatcher 知道自己依赖谁(这里很重要，相当于把所有依赖属性的 dep 收集起来了)
+// 然后：回来 => dep.depend，让依赖属性收集当前 Watcher 为依赖，sub [computedWatcher] => 返回计算之后的值
+// => popTarget[renderWatcher]
+// => dirty = false，表示已经计算过
+
+// ===(继续回到 getter 剩余的逻辑)===
+// => 继续判断是否还有 target，这个时候是 [renderWatcher]
+// watcher.depend(computedWatcher)
+// => 让 computedWatcher 里面的 deps 都收集 renderWatcher(上面是收集 computedWatcher)
+// => 此时所有 computed 依赖的属性都收集了 computedWatcher 和 renderWatcher => sub [computedWatcher, renderWatcher]
+// 初始化结束
+
+
+// 第二种：更新
+// 触发依赖属性的 setter => 触发依赖属性的 dep.notify() => 触发所有 sub 的 update
+// 也就是依次触发 [computedWatcher, renderWatcher] 的 update
+// 1. computedWatcher update
+// => 仅仅只是把 dirty 变成 true，标记需要重新计算了(因为它没有自己的值，都是靠别人计算来的)
+// 2. renderWatcher update
+// => 调用 vm._update(vm._render())，重新根据 render 函数生成的 VNode 去渲染视图
+// 而在 render 的过程中，一定会访问到 computed 属性的值，又一次回到了这里的 getter
+// => dirty 是 true，所以重新求值
+
 
 // 创建 computed 属性的 getter 函数
 // 更新过程: 数据变更 -> computedWatcher -> 渲染watcher -> 更新视图
@@ -429,6 +465,7 @@ function createComputedGetter(key) {
 
         // 在 计算watcher 的 update 过程中已经把 dirty 设为 true 了
         // 所以这里会去调用 evaluate(里面又把 dirty 改回 false 了) 根据传入的函数重新求值，页面上也就显示了最新的值
+        // 这个时候不会执行 depend 了，因为渲染 watcher 已经出栈了
         watcher.depend()
       }
       return watcher.value
@@ -484,8 +521,14 @@ function initMethods(vm: Component, methods: Object) {
 }
 
 function initWatch(vm: Component, watch: Object) {
+
+  // 遍历定义的所有的 watch 的值
   for (const key in watch) {
+
+    // 当前 watch 属性传进来的处理函数
     const handler = watch[key]
+
+    // 如果是数组，遍历进行创建 watcher
     if (isArray(handler)) {
       for (let i = 0; i < handler.length; i++) {
         createWatcher(vm, key, handler[i])
@@ -496,34 +539,56 @@ function initWatch(vm: Component, watch: Object) {
   }
 }
 
+// 创建 watcher
 function createWatcher(
   vm: Component,
   expOrFn: string | (() => any),
   handler: any,
   options?: Object
 ) {
+
+  // 如果是一个对象，handler 回调赋值为对象中 handler 属性
+  /*
+      这里是当watch的写法是这样的时候
+      watch: {
+          test: {
+              handler: function () {},
+              deep: true
+          }
+      }
+  */
   if (isPlainObject(handler)) {
     options = handler
     handler = handler.handler
   }
+
+  // 如果是一个字符串，handler 取 vm[handler]，也就是对应的 method
   if (typeof handler === 'string') {
     handler = vm[handler]
   }
+
+  // $watch 是 Vue 原型上的方法，它是在执行 stateMixin 的时候定义的
   return vm.$watch(expOrFn, handler, options)
 }
 
+// 相当于初始化了原型上的一堆属性和一堆函数
 export function stateMixin(Vue: typeof Component) {
   // flow somehow has problems with directly declared definition object
   // when using Object.defineProperty, so we have to procedurally build up
   // the object here.
+  // data 定义
   const dataDef: any = {}
   dataDef.get = function () {
     return this._data
   }
+
+  // props 定义
   const propsDef: any = {}
   propsDef.get = function () {
     return this._props
   }
+
+  // 进行 set 原型上的私有属性
   if (__DEV__) {
     dataDef.set = function () {
       warn(
@@ -536,31 +601,60 @@ export function stateMixin(Vue: typeof Component) {
       warn(`$props is readonly.`, this)
     }
   }
+
+  // 定义 $data、$props 属性
   Object.defineProperty(Vue.prototype, '$data', dataDef)
   Object.defineProperty(Vue.prototype, '$props', propsDef)
 
+  // 挂载 $set、$delete
   Vue.prototype.$set = set
   Vue.prototype.$delete = del
 
+  // 挂载 $watch 方法 => 给 watch 属性使用、keep-alive 使用
   Vue.prototype.$watch = function (
     expOrFn: string | (() => any),
     cb: any,
     options?: Record<string, any>
   ): Function {
     const vm: Component = this
+
+    // 如果传入的回调还是一个对象，调用 createWatcher 尝试把回调变成函数
     if (isPlainObject(cb)) {
       return createWatcher(vm, expOrFn, cb, options)
     }
     options = options || {}
+
+    // 说明 watcher 是一个 user watcher(自定义的、表示需要执行回调)
     options.user = true
+
+    // 创建 Watcher => targetStack [userWatcher]
+    // 执行 get 方法，会读取到监听的属性，触发 getter 函数，把 user watcher 丢进被监听属性的依赖筐子 dep 里 [其他 Watcher, userWatcher]
+    // 如果此时触发了依赖属性的变更 => setter => dep.notify => 执行所有 sub 的 update，这个时候的 subs 是 [其他 Watcher, userWatcher]
+    // update => 执行回调函数 cb，通知到新旧 value
     const watcher = new Watcher(vm, expOrFn, cb, options)
+
+    // 如果设置了 immediate 属性，直接先执行一次回调
     if (options.immediate) {
       const info = `callback for immediate watcher "${watcher.expression}"`
+
+      // target => use watcher
       pushTarget()
+
+      // 执行回调
       invokeWithErrorHandling(cb, vm, [watcher.value], vm, info)
+
+      // 恢复 target
       popTarget()
     }
+
+    // 更新的逻辑
+    // 如果此时触发了依赖属性的变更 => dep.notify => 通知更新
+    // value = this.getter.call(vm, vm) 调用 getter 进行求值，依赖会被收集到 user watcher 中
+
+    // 返回一个卸载销毁 watcher 的函数 teardown
     return function unwatchFn() {
+
+      // 将自身从所有依赖收集订阅列表删除
       watcher.teardown()
     }
   }

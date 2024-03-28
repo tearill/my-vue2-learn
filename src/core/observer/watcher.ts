@@ -128,6 +128,8 @@ export default class Watcher implements DepTarget {
     this.newDepIds = new Set()
     this.expression = __DEV__ ? expOrFn.toString() : ''
     // parse expression for getter
+
+    // 如果传入了 expOrFn 并且是一个函数，直接将其赋值成为 this.getter
     if (isFunction(expOrFn)) {
       this.getter = expOrFn
     } else {
@@ -143,7 +145,9 @@ export default class Watcher implements DepTarget {
           )
       }
     }
+
     // computedWatcher 在首次进来的时候不会调用 get 求值
+    // 非 computed watcher 会执行 get() 方法
     this.value = this.lazy ? undefined : this.get()
   }
 
@@ -282,9 +286,13 @@ export default class Watcher implements DepTarget {
         // 触发 Watcher 回调
         if (this.user) {
           const info = `callback for watcher "${this.expression}"`
+
+          // 执行 watch 回调
           invokeWithErrorHandling(
             this.cb,
             this.vm,
+
+            // 传入新旧 value
             [value, oldValue],
             this.vm,
             info
@@ -300,6 +308,7 @@ export default class Watcher implements DepTarget {
    * Evaluate the value of the watcher.
    * This only gets called for lazy watchers.
    */
+  // 惰性求值
   evaluate() {
 
     // 调用 get 函数求值
@@ -328,6 +337,7 @@ export default class Watcher implements DepTarget {
   /**
    * Remove self from all dependencies' subscriber list.
    */
+  // 移除所有的依赖
   teardown() {
     if (this.vm && !this.vm._isBeingDestroyed) {
       remove(this.vm._scope.effects, this)

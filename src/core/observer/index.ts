@@ -273,6 +273,7 @@ export function defineReactive(
  * triggers change notification if the property doesn't
  * already exist.
  */
+// 给对象设置一个属性，并让这个属性变成响应式的
 export function set<T>(array: T[], key: number, value: T): T
 export function set<T>(object: object, key: string | number, value: T): T
 export function set(
@@ -333,6 +334,7 @@ export function set(
 /**
  * Delete a property and trigger change if necessary.
  */
+// 删除目标上的属性，并触发响应式更新
 export function del<T>(array: T[], key: number): void
 export function del(object: object, key: string | number): void
 export function del(target: any[] | object, key: any) {
