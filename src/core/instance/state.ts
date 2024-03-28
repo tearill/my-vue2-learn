@@ -641,6 +641,7 @@ export function stateMixin(Vue: typeof Component) {
       pushTarget()
 
       // 执行回调
+      // 只有一个 value，不存在新旧 value 的对比了
       invokeWithErrorHandling(cb, vm, [watcher.value], vm, info)
 
       // 恢复 target
