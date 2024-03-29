@@ -4,11 +4,16 @@ import type { Component } from 'types/component'
 import { resolveProvided } from 'v3/apiInject'
 
 export function initProvide(vm: Component) {
+  // 拿到传入的 provide 配置
   const provideOption = vm.$options.provide
   if (provideOption) {
+
+    // 通过传入的函数或者是配置，获取一下 provide 属性值
     const provided = isFunction(provideOption)
       ? provideOption.call(vm)
       : provideOption
+
+    // 如果不是对象，直接退出
     if (!isObject(provided)) {
       return
     }

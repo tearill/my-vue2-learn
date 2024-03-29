@@ -164,26 +164,41 @@ function callActivatedHooks(queue) {
  * Jobs with duplicate IDs will be skipped unless it's
  * pushed when the queue is being flushed.
  */
+// 将一个观察者对象 push 进观察者队列
+// 如果在队列中已经存在相同的 id 则该观察者对象将被跳过，除非它是在队列被刷新时推送
 export function queueWatcher(watcher: Watcher) {
+
+  // 获取 watcher 的 id
   const id = watcher.id
+
+  // 如果存在相同的 id，跳过
   if (has[id] != null) {
     return
   }
 
+  // 如果没有对应回调方法
   if (watcher === Dep.target && watcher.noRecurse) {
     return
   }
 
+  // 标记当前 watcher 已经在队列中
   has[id] = true
+
+  // 如果不在执行中，不在更新队列
   if (!flushing) {
+
+    // 把当前 watcher 加进队列
     queue.push(watcher)
   } else {
     // if already flushing, splice the watcher based on its id
     // if already past its id, it will be run next immediately.
+    // 如果已经在刷新中
+    // 在队列中寻找当前 watcher 的前一项
     let i = queue.length - 1
     while (i > index && queue[i].id > watcher.id) {
       i--
     }
+    // 把当前的 watcher 放到前一项的后面，保证下一个执行当前 watcher
     queue.splice(i + 1, 0, watcher)
   }
   // queue the flush

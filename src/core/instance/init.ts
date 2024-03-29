@@ -67,7 +67,7 @@ export function initMixin(Vue: typeof Component) {
     vm._self = vm
 
     // 下面的这些 init 操作，都会往 Vue 上挂载一系列相关参数
-    // 初始化生命周期
+    // 初始化生命周期，挂载了生命周期相关的一些标识字段
     initLifecycle(vm)
 
     // 初始化事件
@@ -85,6 +85,7 @@ export function initMixin(Vue: typeof Component) {
 
     // 初始化 state，也就是组件的 "状态"
     // 对 props、methods、data、computed 和 watcher 等属性做了初始化操作
+    // 在这里做了响应式的拦截操作
     initState(vm)
 
     // 初始化 provider 提供的值

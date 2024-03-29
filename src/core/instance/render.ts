@@ -23,6 +23,7 @@ export function initRender(vm: Component) {
   vm._vnode = null // the root of the child tree
   vm._staticTrees = null // v-once cached trees
   const options = vm.$options
+  // $vnode 存父节点，_vnode 存当前节点
   const parentVnode = (vm.$vnode = options._parentVnode!) // the placeholder node in parent tree
   const renderContext = parentVnode && (parentVnode.context as Component)
 
@@ -103,12 +104,15 @@ export function setCurrentRenderingInstance(vm: Component) {
 
 export function renderMixin(Vue: typeof Component) {
   // install runtime convenience helpers
+  // 挂载 render 辅助函数，对应 core/instance/render-helpers 中的所有函数
   installRenderHelpers(Vue.prototype)
 
+  // 挂载 nextTick 方法
   Vue.prototype.$nextTick = function (fn: (...args: any[]) => any) {
     return nextTick(fn, this)
   }
 
+  // _render 渲染函数，返回一个 VNode 节点
   Vue.prototype._render = function (): VNode {
     const vm: Component = this
     const { render, _parentVnode } = vm.$options

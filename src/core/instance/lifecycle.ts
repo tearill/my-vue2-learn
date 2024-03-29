@@ -24,9 +24,14 @@ import { syncSetupProxy } from 'v3/apiSetup'
 export let activeInstance: any = null
 export let isUpdatingChildComponent: boolean = false
 
+// 保存当前的活动实例（activeInstance）到 prevActiveInstance 变量中，并将当前的 Vue 实例设置为活动实例
+// activeInstance 是一个全局变量，用于保存当前正在处理的组件实例
+// 保存当前的活动实例 activeInstance 是为了在组件渲染过程中建立父子组件之间的关联
 export function setActiveInstance(vm: Component) {
   const prevActiveInstance = activeInstance
   activeInstance = vm
+
+  // 返回一个恢复实例的方法，可以在适当的时机手动调用
   return () => {
     activeInstance = prevActiveInstance
   }
@@ -64,23 +69,46 @@ export function initLifecycle(vm: Component) {
 }
 
 export function lifecycleMixin(Vue: typeof Component) {
+
+  // 更新节点
+  // 核心是调用 vm.__patch__，进行 diff 对比
+  // 传入的是新的 VNode
   Vue.prototype._update = function (vnode: VNode, hydrating?: boolean) {
     const vm: Component = this
+
+    // 更新前的节点和 VNode
+    // 保存当前的 $el（组件的根 DOM 元素）到 prevEl 变量中，以备后续操作使用
     const prevEl = vm.$el
+    // 保存当前的虚拟节点（VNode）到 prevVnode
     const prevVnode = vm._vnode
+
+    // 保存一下当前的 vm 实例
+    // 保存当前的活动实例（activeInstance）到 prevActiveInstance 变量中，并将当前的 Vue 实例设置为活动实例
+    // activeInstance 是一个全局变量，用于保存当前正在处理的组件实例
     const restoreActiveInstance = setActiveInstance(vm)
+
+    // _vnode 改成新的 VNode
     vm._vnode = vnode
+
     // Vue.prototype.__patch__ is injected in entry points
     // based on the rendering backend used.
+    // 如果之前没有节点，说明是首次渲染
+    // 直接渲染新的节点
     if (!prevVnode) {
       // initial render
       vm.$el = vm.__patch__(vm.$el, vnode, hydrating, false /* removeOnly */)
     } else {
       // updates
+      // 如果 prevVnode 存在，说明是更新数据，需要对比 diff 然后再更新 DOM
+      // 比较新旧 VNode diff，然后更新
       vm.$el = vm.__patch__(prevVnode, vnode)
     }
+
+    // 执行完成了，恢复 vm 实例
     restoreActiveInstance()
+
     // update __vue__ reference
+    // 更新保存的 vm 引用
     if (prevEl) {
       prevEl.__vue__ = null
     }
@@ -88,60 +116,105 @@ export function lifecycleMixin(Vue: typeof Component) {
       vm.$el.__vue__ = vm
     }
     // if parent is an HOC, update its $el as well
+    // 处理高阶组件（Higher-Order Component，HOC）的更新
+    // 高阶组件通过将组件作为参数传递给另一个组件，返回一个新的组件。在这种模式下，高阶组件可能会对内部组件进行一些包装或增强操作
     let wrapper: Component | undefined = vm
+
+    // 通过 while 循环遍历父组件链，判断当前组件是否是一个高阶组件，并且父组件的虚拟节点和当前组件的虚拟节点相同
+    // 如果满足这些条件，就将父组件的 $el（根 DOM 元素）更新为当前组件的 $el
     while (
       wrapper &&
+      // vm.$vnode 是父组件的 vnode
       wrapper.$vnode &&
       wrapper.$parent &&
+      // vm._vnode 是当前组件的 vnode
       wrapper.$vnode === wrapper.$parent._vnode
     ) {
+      // 将父组件的 $el（根 DOM 元素）更新为当前组件的 $el
       wrapper.$parent.$el = wrapper.$el
       wrapper = wrapper.$parent
+
+      // 这个操作的目的是确保高阶组件的根元素与被包装的组件的根元素保持一致
+      // 由于高阶组件可能会对内部组件进行包装或增强，可能会对根元素进行一些修改
+      // 为了保持一致性，需要将父组件的根元素更新为当前组件的根元素
+      // 原因：避免多层嵌套之后，根组件的特性丢失
     }
     // updated hook is called by the scheduler to ensure that children are
     // updated in a parent's updated hook.
+    // 这个钩子是通过 scheduler 来调度的，这样可以保证子组件的 update 是在父组件的 update 钩子里执行的
   }
 
+  // 强制更新一遍
   Vue.prototype.$forceUpdate = function () {
     const vm: Component = this
+
+    // 这个 watcher 是 renderWatcher
+    // 本质上就是触发了 渲染watcher 的重新执行，和修改一个响应式的属性触发更新的原理是一模一样的，只是提供了一个便捷的 api
+    // 门面模式
     if (vm._watcher) {
       vm._watcher.update()
     }
   }
 
+  // 销毁示例
   Vue.prototype.$destroy = function () {
     const vm: Component = this
+
+    // 如果正在销毁，不重复处理
     if (vm._isBeingDestroyed) {
       return
     }
+
+    // 开始销毁的时候调用 beforeDestroy
     callHook(vm, 'beforeDestroy')
+
+    // 标记正在销毁中
     vm._isBeingDestroyed = true
+
     // remove self from parent
+    // 把当前实例从它的父节点中移除，断开和父节点的联系
     const parent = vm.$parent
     if (parent && !parent._isBeingDestroyed && !vm.$options.abstract) {
       remove(parent.$children, vm)
     }
+
     // teardown scope. this includes both the render watcher and other
     // watchers created
+    // 销毁 scope
+    // 3.29 备注：这里暂时不支持 scope 里面有什么，后面再回来看
     vm._scope.stop()
+
     // remove reference from data ob
     // frozen object may not have observer.
+    // vmCount - 1，vmCount 是当前 vm 实例的个数
     if (vm._data.__ob__) {
       vm._data.__ob__.vmCount--
     }
+
     // call the last hook...
+    // 标记销毁完成
     vm._isDestroyed = true
+
     // invoke destroy hooks on current rendered tree
+    // 调用 patch，销毁当前 render tree
     vm.__patch__(vm._vnode, null)
+
     // fire destroyed hook
+    // 销毁完成，调用 destroyed
     callHook(vm, 'destroyed')
+
     // turn off all instance listeners.
+    // 取消所有的事件监听
     vm.$off()
+
     // remove __vue__ reference
+    // 销毁引用
     if (vm.$el) {
       vm.$el.__vue__ = null
     }
+
     // release circular reference (#6759)
+    // 断开 VNode 连接
     if (vm.$vnode) {
       vm.$vnode.parent = null
     }
@@ -200,6 +273,9 @@ export function mountComponent(
       measure(`vue ${name} patch`, startTag, endTag)
     }
   } else {
+
+    // vm._render() 生成虚拟 VNode
+    // 最终调用 vm._update() 更新 DOM
     updateComponent = () => {
       vm._update(vm._render(), hydrating)
     }
@@ -221,6 +297,9 @@ export function mountComponent(
   // we set this to vm._watcher inside the watcher's constructor
   // since the watcher's initial patch may call $forceUpdate (e.g. inside child
   // component's mounted hook), which relies on vm._watcher being already defined
+  // 渲染 Watcher
+  // 1. 初始化执行回调函数
+  // 2. 当 vm 实例中的监测的数据发生变化的时候执行回调函数
   new Watcher(
     vm,
     updateComponent,
@@ -240,6 +319,8 @@ export function mountComponent(
 
   // manually mounted instance, call mounted on self
   // mounted is called for render-created child components in its inserted hook
+  // 函数最后判断为根节点的时候设置 vm._isMounted 为 true， 表示这个实例已经挂载了，同时执行 mounted
+  // vm.$vnode 表示 Vue 实例的父虚拟 VNode，所以它为 null 则表示当前是根 Vue 的实例
   if (vm.$vnode == null) {
     vm._isMounted = true
     callHook(vm, 'mounted')

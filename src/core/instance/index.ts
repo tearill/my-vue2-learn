@@ -24,8 +24,11 @@ function Vue(options) {
 // 向 Vue 原型上挂载 _init 方法
 initMixin(Vue)
 //@ts-expect-error Vue has function type
+// 相当于初始化了原型上的一堆属性和一堆函数
+// $set、$del、$watch
 stateMixin(Vue)
 //@ts-expect-error Vue has function type
+// 为 Vue 原型上加入操作事件的方法，就是完整的 event-bus 系列方法
 eventsMixin(Vue)
 //@ts-expect-error Vue has function type
 // 向 Vue 原型上挂载生命周期函数相关方法
