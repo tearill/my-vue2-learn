@@ -5,11 +5,13 @@ import { parseFilters } from './parser/filter-parser'
 type Range = { start?: number; end?: number }
 
 /* eslint-disable no-unused-vars */
+// 编译错误提示
 export function baseWarn(msg: string, range?: Range) {
   console.error(`[Vue compiler]: ${msg}`)
 }
 /* eslint-enable no-unused-vars */
 
+// 提取对象数组中指定属性的值，并返回一个新的数组
 export function pluckModuleFunction<T, K extends keyof T>(
   modules: Array<T> | undefined,
   key: K

@@ -11,6 +11,7 @@ import { genStaticKeys } from 'shared/util'
 import { isUnaryTag, canBeLeftOpenTag } from './util'
 import { CompilerOptions } from 'types/compiler'
 
+// 根据不同的平台生成不同的 baseOptions
 export const baseOptions: CompilerOptions = {
   expectHTML: true,
   modules,

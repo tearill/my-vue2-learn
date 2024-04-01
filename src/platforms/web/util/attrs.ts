@@ -5,6 +5,7 @@ import { makeMap } from 'shared/util'
 export const isReservedAttr = makeMap('style,class')
 
 // attributes that should be using props for binding
+// 检测一个标签元素是否必须使用属性来进行绑定
 const acceptValue = makeMap('input,textarea,option,select,progress')
 export const mustUseProp = (
   tag: string,

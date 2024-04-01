@@ -9,11 +9,14 @@ type CompiledFunctionResult = {
   staticRenderFns: Array<Function>
 }
 
+// 把对应的 code 转换成函数
 function createFunction(code, errors) {
   try {
     return new Function(code)
   } catch (err: any) {
     errors.push({ err, code })
+
+    // 转换错误的时候返回空函数
     return noop
   }
 }
@@ -49,6 +52,7 @@ export function createCompileToFunctionFn(compile: Function): Function {
     }
 
     // check cache
+    // 有缓存的时候直接取出缓存中的结果即可
     const key = options.delimiters
       ? String(options.delimiters) + template
       : template
@@ -57,6 +61,7 @@ export function createCompileToFunctionFn(compile: Function): Function {
     }
 
     // compile
+    // 编译
     const compiled = compile(template, options)
 
     // check compilation errors/tips
@@ -79,6 +84,8 @@ export function createCompileToFunctionFn(compile: Function): Function {
           )
         }
       }
+
+      // 编译错误警告
       if (compiled.tips && compiled.tips.length) {
         if (options.outputSourceRange) {
           compiled.tips.forEach(e => tip(e.msg, vm))
@@ -91,7 +98,11 @@ export function createCompileToFunctionFn(compile: Function): Function {
     // turn code into functions
     const res: any = {}
     const fnGenErrors: any[] = []
+
+    // 把 render 和 staticRenderFns 转换成函数
     res.render = createFunction(compiled.render, fnGenErrors)
+
+    // 将 staticRenderFns 全部转化成 Function 对象
     res.staticRenderFns = compiled.staticRenderFns.map(code => {
       return createFunction(code, fnGenErrors)
     })
@@ -114,6 +125,7 @@ export function createCompileToFunctionFn(compile: Function): Function {
       }
     }
 
+    // 放在缓存里，避免每次都重新编译
     return (cache[key] = res)
   }
 }

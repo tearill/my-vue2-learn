@@ -34,6 +34,7 @@ eventsMixin(Vue)
 // 向 Vue 原型上挂载生命周期函数相关方法
 lifecycleMixin(Vue)
 //@ts-expect-error Vue has function type
+// 挂载渲染相关的 _render、$nextTick 函数
 renderMixin(Vue)
 
 export default Vue as unknown as GlobalAPI

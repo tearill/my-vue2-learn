@@ -28,25 +28,46 @@ import {
   CompilerOptions
 } from 'types/compiler'
 
+// 匹配 @ 以及 v-on，绑定事件
 export const onRE = /^@|^v-on:/
+
+// 匹配v-、@以及:
 export const dirRE = process.env.VBIND_PROP_SHORTHAND
   ? /^v-|^@|^:|^\.|^#/
   : /^v-|^@|^:|^#/
+
+// 匹配 v-for 中的 in 以及 of
 export const forAliasRE = /([\s\S]*?)\s+(?:in|of)\s+([\s\S]*)/
+
+// 匹配 v-for 参数中带括号的情况，比如 (item, index) 这样的参数
 export const forIteratorRE = /,([^,\}\]]*)(?:,([^,\}\]]*))?$/
+
+// (全局)匹配开头或结尾的小括号
 const stripParensRE = /^\(|\)$/g
+
+// 匹配用方括号包裹的动态参数，例如 [prop]
 const dynamicArgRE = /^\[.*\]$/
 
+// 匹配 . 开始的字符串
 const argRE = /:(.*)$/
+
+// 匹配 v-bind 以及 :
 export const bindRE = /^:|^\.|^v-bind:/
 const propBindRE = /^\./
+
+// 根据点来分开各个级别的正则，比如 a.b.c.d 解析后可以得到 .b .c .d
 const modifierRE = /\.[^.\]]+(?=[^\]]*$)/g
 
+// 匹配 v-slot
 export const slotRE = /^v-slot(:|$)|^#/
 
+// 匹配换行
 const lineBreakRE = /[\r\n]/
+
+// (全局)匹配一个、多个空格、换行符、制表符、回车符，也就是空白内容
 const whitespaceRE = /[ \f\t\r\n]+/g
 
+// 匹配无效属性
 const invalidAttributeRE = /[\s"'<>\/=]/
 
 const decodeHTMLCached = cached(he.decode)
@@ -64,18 +85,33 @@ let platformMustUseProp
 let platformGetTagNamespace
 let maybeComponent
 
+// 把某一个节点转换成对应的 AST
 export function createASTElement(
   tag: string,
   attrs: Array<ASTAttr>,
   parent: ASTElement | void
 ): ASTElement {
   return {
+
+    // 节点类型
     type: 1,
+
+    // 标签名
     tag,
+
+    // 属性
     attrsList: attrs,
+
+    // 属性表
     attrsMap: makeAttrsMap(attrs),
+
+    // 原始属性表
     rawAttrsMap: {},
+
+    // 父节点
     parent,
+
+    // 子节点数组
     children: []
   }
 }
@@ -83,13 +119,27 @@ export function createASTElement(
 /**
  * Convert HTML string to AST.
  */
+// 把 HTML 转换成 AST
+// 这里给的 HTML 就是 new Vue 时的 template 模板部分
 export function parse(template: string, options: CompilerOptions): ASTElement {
+
+  // 增加警告函数，baseWarn 是 Vue 编译器默认警告
   warn = options.warn || baseWarn
 
+  // 下面都是一些函数
+  // 检测是否是 <pre> 标签
   platformIsPreTag = options.isPreTag || no
+
+  // 检测一个标签元素是否必须使用属性来进行绑定
   platformMustUseProp = options.mustUseProp || no
+
+  // 获取标签的命名空间(svg 和 math)
   platformGetTagNamespace = options.getTagNamespace || no
+
+  // 检测一个标签是否是保留标签(HTML 标签和 svg 标签)
   const isReservedTag = options.isReservedTag || no
+
+  // 判断是否是组件
   maybeComponent = (el: ASTElement) =>
     !!(
       el.component ||
@@ -97,21 +147,36 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
       el.attrsMap['v-bind:is'] ||
       !(el.attrsMap.is ? isReservedTag(el.attrsMap.is) : isReservedTag(el.tag))
     )
+
+  // 从 Vue 的模块化配置中提取特定模块的函数或方法，并组成一个新的数组
   transforms = pluckModuleFunction(options.modules, 'transformNode')
   preTransforms = pluckModuleFunction(options.modules, 'preTransformNode')
   postTransforms = pluckModuleFunction(options.modules, 'postTransformNode')
 
+  // 分割符 ['${', '}']
   delimiters = options.delimiters
 
+  // 存放 ele
   const stack: any[] = []
+
+  // 是否保留空格
   const preserveWhitespace = options.preserveWhitespace !== false
   const whitespaceOption = options.whitespace
+
+  // 根节点
   let root
+
+  // 某个临时的节点
   let currentParent
+
+  // 标志位，是否有 v-pre 属性
   let inVPre = false
+
+  // 标志位，是否是 pre 标签
   let inPre = false
   let warned = false
 
+  // 只发出一次的 warning
   function warnOnce(msg, range) {
     if (!warned) {
       warned = true
@@ -120,7 +185,11 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
   }
 
   function closeElement(element) {
+
+    // 去除末尾的空节点
     trimEndingWhitespace(element)
+
+    // 没处理过
     if (!inVPre && !element.processed) {
       element = processElement(element, options)
     }
@@ -169,9 +238,12 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     trimEndingWhitespace(element)
 
     // check pre state
+    // 是否有 v-pre 属性，存在则标志位变为 false
+    // 因为这里已经是结束 end，存在 v-pre 时在 start 中会被标志为 true
     if (element.pre) {
       inVPre = false
     }
+    // 检测是否是 <pre> 标签
     if (platformIsPreTag(element.tag)) {
       inPre = false
     }
@@ -181,6 +253,7 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     }
   }
 
+  // 移除元素节点末尾的空白文本节点
   function trimEndingWhitespace(el) {
     // remove trailing whitespace node
     if (!inPre) {
@@ -195,15 +268,24 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     }
   }
 
+  // 检查元素节点是否符合组件根元素的约束条件
   function checkRootConstraints(el) {
+
+    // 是否是 slot 或 template
     if (el.tag === 'slot' || el.tag === 'template') {
+
+      // 不能将 <slot> 或 <template> 标签作为组件的根元素，因为它们可能包含多个节点
       warnOnce(
         `Cannot use <${el.tag}> as component root element because it may ` +
           'contain multiple nodes.',
         { start: el.start }
       )
     }
+
+    // 判断节点是否有 v-for 属性
     if (el.attrsMap.hasOwnProperty('v-for')) {
+
+      // 不能在具有状态的组件的根元素上使用 v-for，因为它会渲染多个元素
       warnOnce(
         'Cannot use v-for on stateful component root element because ' +
           'it renders multiple elements.',
@@ -221,6 +303,8 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     shouldDecodeNewlinesForHref: options.shouldDecodeNewlinesForHref,
     shouldKeepComment: options.comments,
     outputSourceRange: options.outputSourceRange,
+
+    // 处理开始标签
     start(tag, attrs, unary, start, end) {
       // check namespace.
       // inherit parent ns if there is one
@@ -229,11 +313,15 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
 
       // handle IE svg bug
       /* istanbul ignore if */
+      // 处理 svg 的 bug
       if (isIE && ns === 'svg') {
         attrs = guardIESVGBug(attrs)
       }
 
+      // 把传进来的 element 转换成 AST 对象
       let element: ASTElement = createASTElement(tag, attrs, currentParent)
+
+      // 命名空间
       if (ns) {
         element.ns = ns
       }
@@ -298,9 +386,11 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
         processOnce(element)
       }
 
+      // 根节点，只能有一个
       if (!root) {
         root = element
         if (__DEV__) {
+          // 检查根节点是否符合条件
           checkRootConstraints(root)
         }
       }
@@ -313,6 +403,7 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
       }
     },
 
+    // 处理结尾标签
     end(tag, start, end) {
       const element = stack[stack.length - 1]
       // pop stack
@@ -941,6 +1032,7 @@ function parseModifiers(name: string): Object | void {
   }
 }
 
+// 生成属性 map
 function makeAttrsMap(attrs: Array<Record<string, any>>): Record<string, any> {
   const map = {}
   for (let i = 0, l = attrs.length; i < l; i++) {

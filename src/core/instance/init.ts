@@ -23,6 +23,8 @@ export function initMixin(Vue: typeof Component) {
     let startTag, endTag
     /* istanbul ignore if */
     if (__DEV__ && config.performance && mark) {
+
+      // 性能记录
       startTag = `vue-perf-start:${vm._uid}`
       endTag = `vue-perf-end:${vm._uid}`
       mark(startTag)
@@ -30,7 +32,7 @@ export function initMixin(Vue: typeof Component) {
 
     // a flag to mark this as a Vue instance without having to do instanceof
     // check
-    // 一个防止 vm 实例自身被观察的标志位
+    // 一个防止 vm 实例自身被观察的标志位，通过一个属性值代替 instanceof 判断
     vm._isVue = true
     // avoid instances from being observed
     vm.__v_skip = true
@@ -99,6 +101,8 @@ export function initMixin(Vue: typeof Component) {
 
       // 格式化组件名
       vm._name = formatComponentName(vm, false)
+
+      // init 耗时计算
       mark(endTag)
       measure(`vue ${vm._name} init`, startTag, endTag)
     }

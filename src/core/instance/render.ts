@@ -115,8 +115,11 @@ export function renderMixin(Vue: typeof Component) {
   // _render 渲染函数，返回一个 VNode 节点
   Vue.prototype._render = function (): VNode {
     const vm: Component = this
+
+    // 取到 render 函数 => 可以是自己写的，也可以是编译生成的
     const { render, _parentVnode } = vm.$options
 
+    // 如果组件已经挂载了
     if (_parentVnode && vm._isMounted) {
       vm.$scopedSlots = normalizeScopedSlots(
         vm.$parent!,
@@ -137,8 +140,12 @@ export function renderMixin(Vue: typeof Component) {
     const prevRenderInst = currentRenderingInstance
     let vnode
     try {
+      // 保存当前实例
       setCurrentInstance(vm)
       currentRenderingInstance = vm
+
+      // 创建 VNode
+      // 调用 $createElement
       vnode = render.call(vm._renderProxy, vm.$createElement)
     } catch (e: any) {
       handleError(e, vm, `render`)
@@ -160,6 +167,7 @@ export function renderMixin(Vue: typeof Component) {
         vnode = vm._vnode
       }
     } finally {
+      // VNode 生成操作结束后恢复当前渲染中的实例
       currentRenderingInstance = prevRenderInst
       setCurrentInstance(prevInst)
     }
@@ -176,9 +184,12 @@ export function renderMixin(Vue: typeof Component) {
           vm
         )
       }
+
+      // 如果 render 函数生成错误，返回的不是一个 VNode 对象，返回一个空的 VNode 节点
       vnode = createEmptyVNode()
     }
     // set parent
+    // 设置父节点
     vnode.parent = _parentVnode
     return vnode
   }

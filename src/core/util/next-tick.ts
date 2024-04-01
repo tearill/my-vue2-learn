@@ -50,6 +50,7 @@ let timerFunc
 // completely stops working after triggering a few times... so, if native
 // Promise is available, we will use it:
 /* istanbul ignore next, $flow-disable-line */
+// 下面这一段代码的目的是在下一个事件循环中执行 flushCallbacks
 if (typeof Promise !== 'undefined' && isNative(Promise)) {
   const p = Promise.resolve()
 
