@@ -184,6 +184,9 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     }
   }
 
+  // 这个函数会在解析非一元开始标签和解析结束标签的时候调用
+  // 1. 对数据状态进行还原
+  // 2. 调用后置处理转换钩子函数
   function closeElement(element) {
 
     // 去除末尾的空节点
@@ -294,6 +297,8 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     }
   }
 
+  // 解析 template 字符串
+  // 生成 AST 的主要步骤是在解析的过程中，会调用对应的钩子函数
   parseHTML(template, {
     warn,
     expectHTML: options.expectHTML,
@@ -304,7 +309,8 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
     shouldKeepComment: options.comments,
     outputSourceRange: options.outputSourceRange,
 
-    // 处理开始标签
+    // 处理开始标签，将开始标签生成 AST
+    // 作为钩子函数传入给 parseHTML 内部使用
     start(tag, attrs, unary, start, end) {
       // check namespace.
       // inherit parent ns if there is one
@@ -319,6 +325,31 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
       }
 
       // 把传进来的 element 转换成 AST 对象
+      // 举例：<div><span></span><p></p></div>
+      // 首次解析到的是 <div>
+      // 对应 AST 如：
+      // {
+      //   type: 1,
+      //   tag:"div",
+      //   parent: null,
+      //   children: [],
+      //   attrsList: []
+      // }
+
+      // 第二次：
+      // {
+      //   type: 1,
+      //   tag:"div",
+      //   parent: {/*div 元素的描述*/},
+      //   attrsList: []
+      //   children: [{
+      //      type: 1,
+      //      tag:"span",
+      //      parent: div,
+      //      attrsList: [],
+      //      children:[]
+      //   }],
+      // }
       let element: ASTElement = createASTElement(tag, attrs, currentParent)
 
       // 命名空间
@@ -387,6 +418,8 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
       }
 
       // 根节点，只能有一个
+      // 判断 root 是否存在，如果不存在则直接将 element 赋值给 root
+      // root 是一个记录值，也就是最后解析返回的整个 AST
       if (!root) {
         root = element
         if (__DEV__) {
@@ -395,35 +428,72 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
         }
       }
 
+      // 如果当前标签不是一元标签时，会将当前的 element 赋值给 currentParent
+      // 目的是为建立父子元素的关系
       if (!unary) {
         currentParent = element
+
+        // 将元素入栈，入栈的目的是为了做回退操作
+        // 按照之前的例子，此时 stack: [{ tag : "div"... }]
+        // 第二次：stack = [{ tag : "div"... }, {tag : "span"...}]
         stack.push(element)
       } else {
         closeElement(element)
       }
     },
 
-    // 处理结尾标签
+    // 处理结尾标签，作为钩子函数传入给 parseHTML 内部使用
+    // 当解析到结束标签就会调用结束标签的钩子函数
+    // 还是上面的例子：<div><span></span><p></p></div>
+    // start 钩子解析完 <div><span> 后，遇到了 </span>，开始调用 end 钩子
     end(tag, start, end) {
+
+      // 首先保存最后一个元素，将 stack 的最后一个元素删除
       const element = stack[stack.length - 1]
+
       // pop stack
+      // 做了一个回退操作
+      // 变成 stack = [{tag: "div" ...}]
       stack.length -= 1
+
+      // 设置 currentParent 为 stack 的最后一个元素
       currentParent = stack[stack.length - 1]
       if (__DEV__ && options.outputSourceRange) {
         element.end = end
       }
+
+      // 为什么回退？
+      // (解析完一对标签之后，从栈内删除，避免影响后面的解析，类似 leetcode 括号匹配那道题)
+      // 当再次解析到开始标签时，就会再次调用 start 钩子函数
+      // 在解析 p 的开始标签时：stack = [{tag:"div"...},{tag:"p"...}]
+      // 由于在解析到上一个 </span> 标签时做了一个回退操作
+      // 这就能保证在解析 p 开始标签的时候，stack 中存储的是 p 标签父级元素的描述对象
+
+      // 遇到开始标签就生成元素，通过 AST 对象描述上下文关系 parent、children 等
+      // 每当遇到一个非一元标签的结束标签时，都会回退 currentParent 变量的值为之前的值
+      // 这样就修正了当前正在解析的元素的父级元素
+
       closeElement(element)
     },
 
+    // 当遇到文本时，就会调用 chars 钩子函数
     chars(text: string, start?: number, end?: number) {
+
+      // 判断 currentParent（指向的是当前节点的父节点） 变量是否存在，不存在就说明:
+      // 1: 只有文本节点
+      // 2: 文本在根元素之外
+      // 这两种情况都会警告提醒，结束操作
       if (!currentParent) {
         if (__DEV__) {
+
+          // 只有文本节点，没有根节点
           if (text === template) {
             warnOnce(
               'Component template requires a root element, rather than just text.',
               { start }
             )
           } else if ((text = text.trim())) {
+            // 文本在根元素之外
             warnOnce(`text "${text}" outside root element will be ignored.`, {
               start
             })
@@ -433,6 +503,8 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
       }
       // IE textarea placeholder bug
       /* istanbul ignore if */
+      // 解决 IE textarea 占位符的问题
+      // https://github.com/vuejs/vue/issues/4098
       if (
         isIE &&
         currentParent.tag === 'textarea' &&
@@ -466,7 +538,13 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
         }
         let res
         let child: ASTNode | undefined
+
+        // 判断当前元素未使用 v-pre 指令，text 不为空，使用 parseText 函数成功解析当前文本节点的内容
+        // parseText 函数的作用就是用来解析如果文本包含了字面量表达式
+        // 例如：<div>1111: {{ text }}</div>
         if (!inVPre && text !== ' ' && (res = parseText(text, delimiters))) {
+
+          // 解析之后生成一个 type: 2 的描述对象
           child = {
             type: 2,
             expression: res.expression,
@@ -478,11 +556,16 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
           !children.length ||
           children[children.length - 1].text !== ' '
         ) {
+          // 如果使用了 v-pre || test 为空 || parseText 解析失败
+          // 生成一个 type = 3 的纯文本描述对象
           child = {
             type: 3,
             text
           }
         }
+
+        // 最后将解析得到的描述对象，添加到当前父元素的 children 列表中
+        // 因为必须要有根元素
         if (child) {
           if (__DEV__ && options.outputSourceRange) {
             child.start = start
@@ -492,13 +575,21 @@ export function parse(template: string, options: CompilerOptions): ASTElement {
         }
       }
     },
+
+    // 处理注释解析的钩子函数
+    // 如果开启了保留注释匹配后，浏览器会保留注释
+    // 但是可能对布局产生影响，尤其是对行内元素的影响
+    // 为了消除这些影响带来的问题，最好是将它们去掉
     comment(text: string, start, end) {
       // adding anything as a sibling to the root node is forbidden
       // comments should still be allowed, but ignored
+      // 创建注释节点，然后添加当前父元素的 children 列表中
       if (currentParent) {
         const child: ASTText = {
           type: 3,
           text,
+
+          // 注释节点，和普通文本节点做区分
           isComment: true
         }
         if (__DEV__ && options.outputSourceRange) {

@@ -84,6 +84,8 @@ export interface HTMLParserOptions extends CompilerOptions {
   comment?: (content: string, start: number, end: number) => void
 }
 
+// 解析 HTML，只是解析完了 template 字符串
+// 生成 AST 的主要步骤是在解析的过程中，会调用对应的钩子函数，也就是 options.xxx()
 export function parseHTML(html, options: HTMLParserOptions) {
 
   // 存储开始标签
@@ -125,7 +127,9 @@ export function parseHTML(html, options: HTMLParserOptions) {
           // 注释节点结束的位置
           const commentEnd = html.indexOf('-->')
 
+          // 解析注释节点，生成对应的 AST 描述结构
           if (commentEnd >= 0) {
+            // 当配置了 options.comments = true ，意味着需要保留注释
             if (options.shouldKeepComment && options.comment) {
               options.comment(
                 html.substring(4, commentEnd),
@@ -161,10 +165,13 @@ export function parseHTML(html, options: HTMLParserOptions) {
 
         // End tag:
         // 解析截取结束标签
+        // 匹配到了结束标签
         const endTagMatch = html.match(endTag)
         if (endTagMatch) {
           const curIndex = index
           advance(endTagMatch[0].length)
+
+          // 获取到结束标签的标签名称、开始位置和结束位置，开始进行解析操作
           parseEndTag(endTagMatch[1], curIndex, index)
           continue
         }
@@ -184,8 +191,13 @@ export function parseHTML(html, options: HTMLParserOptions) {
       }
 
       let text, rest, next
+      // 当前 template < 不在第一个位置
+      // 这里的判断处理就是为了处理在一些纯文本中也会写 < 标记的场景
+      // 例如：<div>1<2</div>
       if (textEnd >= 0) {
         rest = html.slice(textEnd)
+
+        // 循环找出包含 < 的这一段文本，并将这一段当成一个纯文本处理
         while (
           !endTag.test(rest) &&
           !startTagOpen.test(rest) &&
@@ -193,8 +205,11 @@ export function parseHTML(html, options: HTMLParserOptions) {
           !conditionalComment.test(rest)
         ) {
           // < in plain text, be forgiving and treat it as text
+          // 当做纯文本处理
           next = rest.indexOf('<', 1)
           if (next < 0) break
+
+          // 继续向后处理
           textEnd += next
           rest = html.slice(textEnd)
         }
@@ -202,6 +217,7 @@ export function parseHTML(html, options: HTMLParserOptions) {
       }
 
       // 纯文本节点
+      // 当前 template 不存在 <，直接移动指针
       if (textEnd < 0) {
         text = html
       }
@@ -211,6 +227,7 @@ export function parseHTML(html, options: HTMLParserOptions) {
         advance(text.length)
       }
 
+      // 处理文本节点，生成文本节点的 AST
       if (options.chars && text) {
         options.chars(text, index - text.length, index)
       }
@@ -256,6 +273,11 @@ export function parseHTML(html, options: HTMLParserOptions) {
 
   // Clean up any remaining tags
   // 清空闭合标签
+  // 当 while 循环解析了一遍 template 之后，会再调用一次 parseEndTag
+  // 处理 stack 栈中剩余未处理的标签
+  // 当调用时，没有传递任何参数，也意味着 tagName, start, end 都是空的，这时 pos 为 0
+  // 所以 i >= pos 始终成立，这个时候 stack 栈中如果有剩余未处理的标签，则会逐个警告缺少闭合标签
+  // 并调用 options.end 将其闭合
   parseEndTag()
 
   // 在解析 template 字符串的时候，需要对字符串逐一扫描
@@ -363,6 +385,7 @@ export function parseHTML(html, options: HTMLParserOptions) {
       lastTag = tagName
     }
 
+    // 传入的 start 钩子函数，生成 AST
     if (options.start) {
       options.start(tagName, attrs, unary, match.start, match.end)
     }
@@ -375,6 +398,7 @@ export function parseHTML(html, options: HTMLParserOptions) {
     if (end == null) end = index
 
     // Find the closest opened tag of the same type
+    // 查找同一类型的最近打开的标记，并记录位置
     if (tagName) {
       lowerCasedTagName = tagName.toLowerCase()
       for (pos = stack.length - 1; pos >= 0; pos--) {
@@ -387,9 +411,12 @@ export function parseHTML(html, options: HTMLParserOptions) {
       pos = 0
     }
 
+    // 如果存在同一类型的标记，就将 stack 中匹配的标记弹出
     if (pos >= 0) {
       // Close all the open elements, up the stack
       for (let i = stack.length - 1; i >= pos; i--) {
+
+        // 提醒标签不匹配
         if (__DEV__ && (i > pos || !tagName) && options.warn) {
           options.warn(`tag <${stack[i].tag}> has no matching end tag.`, {
             start: stack[i].start,
@@ -405,10 +432,12 @@ export function parseHTML(html, options: HTMLParserOptions) {
       stack.length = pos
       lastTag = pos && stack[pos - 1].tag
     } else if (lowerCasedTagName === 'br') {
+      // 如果没有同一类型的标记，分别处理 </br>、</p> 标签
       if (options.start) {
         options.start(tagName, [], true, start, end)
       }
     } else if (lowerCasedTagName === 'p') {
+      // 如果没有同一类型的标记，分别处理 </br>、</p> 标签
       if (options.start) {
         options.start(tagName, [], false, start, end)
       }
@@ -416,5 +445,13 @@ export function parseHTML(html, options: HTMLParserOptions) {
         options.end(tagName, start, end)
       }
     }
+
+    // 如果没有同一类型的标记，分别处理 </br>、</p> 标签
+    // 这是为了和浏览器保持同样的行为
+    // 举个例子：
+    // 在代码中，分别写了</br>、</p>的结束标签，但注意我们并没有写起始标签，但是浏览器是能够正常解析他们的
+    // 其中 </br> 标签被正常解析为 <br> 标签，而</p>标签被正常解析为 <p></p>
+    // 除了 br 与 p 其他任何标签如果你只写了结束标签那么浏览器都将会忽略
+    // 所以为了与浏览器的行为相同，parseEndTag 函数也需要专门处理 br 与 p 的结束标签，即：</br> 和 </p>
   }
 }
