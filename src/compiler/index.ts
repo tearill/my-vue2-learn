@@ -26,7 +26,7 @@ export const createCompiler = createCompilerCreator(function baseCompile(
    1.把它们变成常数，这样我们就再也不需要每次重新渲染时创建新的节点了。
    2.在 patch 的过程中直接跳过
    */
-  // optimize 的主要作用是标记 static 静态节点，这是 Vue在编译过程中的一处优化
+  // optimize 的主要作用是标记 static 静态节点，这是 Vue 在编译过程中的一处优化
   // 后面当 update 更新时，会有一个 patch 的过程，diff 算法会直接跳过静态节点，从而减少了比较的过程，优化了 patch 的性能
   if (options.optimize !== false) {
     optimize(ast, options)

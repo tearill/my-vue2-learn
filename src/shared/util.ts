@@ -115,6 +115,8 @@ export function toNumber(val: string): number | string {
  * Make a map and return a function for checking if a key
  * is in that map.
  */
+// 通过传入的 key 构建一个表，以闭包变量的形式存在
+// 返回一个函数用来检查表中是否有某个 key
 export function makeMap(
   str: string,
   expectsLowerCase?: boolean
@@ -166,7 +168,9 @@ export function hasOwn(obj: Object | Array<any>, key: string): boolean {
 /**
  * Create a cached version of a pure function.
  */
+// 创建带有缓存的函数
 export function cached<R>(fn: (str: string) => R): (sr: string) => R {
+  // 使用闭包保存函数的运行结果
   const cache: Record<string, R> = Object.create(null)
   return function cachedFn(str: string) {
     const hit = cache[str]
