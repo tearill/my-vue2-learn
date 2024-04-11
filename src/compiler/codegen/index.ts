@@ -55,6 +55,7 @@ export type CodegenResult = {
 }
 
 // 根据 AST 生成代码
+// 将 AST 语法树转化成 render 以及 staticRenderFns 字符串
 export function generate(
   ast: ASTElement | void,
   options: CompilerOptions
@@ -72,25 +73,42 @@ export function generate(
   }
 }
 
+
+// 处理 element
+// 分别处理 static 静态节点、v-once、v-for、v-if、template、slot 以及组件或元素
 export function genElement(el: ASTElement, state: CodegenState): string {
   if (el.parent) {
     el.pre = el.pre || el.parent.pre
   }
 
+  // 每次处理前都会先判断对应内容是否被处理过
   if (el.staticRoot && !el.staticProcessed) {
+
+    // 处理 static 静态节点
     return genStatic(el, state)
   } else if (el.once && !el.onceProcessed) {
+
+    // 处理 v-once
     return genOnce(el, state)
   } else if (el.for && !el.forProcessed) {
+
+    // 处理 v-for
     return genFor(el, state)
   } else if (el.if && !el.ifProcessed) {
+
+    // 处理 v-if
     return genIf(el, state)
   } else if (el.tag === 'template' && !el.slotTarget && !state.pre) {
+
+    // 处理 template
     return genChildren(el, state) || 'void 0'
   } else if (el.tag === 'slot') {
+
+    // 处理 slot
     return genSlot(el, state)
   } else {
     // component or element
+    // 处理组件或者元素
     let code
     if (el.component) {
       code = genComponent(el.component, el, state)
@@ -155,7 +173,10 @@ function checkBindingType(bindings: BindingMetadata, key: string) {
 }
 
 // hoist static sub-trees out
+// 处理 static 静态节点
 function genStatic(el: ASTElement, state: CodegenState): string {
+
+  // 标记处理过
   el.staticProcessed = true
   // Some elements (templates) need to behave differently inside of a v-pre
   // node.  All pre nodes are static roots, so we can use this as a location to
@@ -164,6 +185,8 @@ function genStatic(el: ASTElement, state: CodegenState): string {
   if (el.pre) {
     state.pre = el.pre
   }
+
+  // 应该会走到最后一个 else，进去处理元素
   state.staticRenderFns.push(`with(this){return ${genElement(el, state)}}`)
   state.pre = originalPreState
   return `_m(${state.staticRenderFns.length - 1}${
@@ -172,21 +195,36 @@ function genStatic(el: ASTElement, state: CodegenState): string {
 }
 
 // v-once
+// 处理 v-once 节点
 function genOnce(el: ASTElement, state: CodegenState): string {
+
+  // 标记处理过
   el.onceProcessed = true
+
+  // 处理 v-if
+  // 如果同时还存在 v-if 的时候需要处理 v-if
   if (el.if && !el.ifProcessed) {
     return genIf(el, state)
   } else if (el.staticInFor) {
+
+    // 处理 for 循环中的 static、v-once 节点
     let key = ''
     let parent = el.parent
+
+    // 向上遍历父节点，找到 v-for
     while (parent) {
+      // 找到 v-for，记录 key
       if (parent.for) {
         key = parent.key!
         break
       }
       parent = parent.parent
     }
+
+    // 如果没找到 key
     if (!key) {
+
+      // 如果 v-once 出现在 for 中，必须要给 v-for 的节点设置 key
       __DEV__ &&
         state.warn(
           `v-once can only be used inside v-for that is keyed. `,
@@ -196,40 +234,54 @@ function genOnce(el: ASTElement, state: CodegenState): string {
     }
     return `_o(${genElement(el, state)},${state.onceId++},${key})`
   } else {
+
+    // 生成静态代码
     return genStatic(el, state)
   }
 }
 
+// 处理 v-if 节点
 export function genIf(
   el: any,
   state: CodegenState,
   altGen?: Function,
   altEmpty?: string
 ): string {
+
+  // 标记处理过
   el.ifProcessed = true // avoid recursion
   return genIfConditions(el.ifConditions.slice(), state, altGen, altEmpty)
 }
 
+// 处理 if 的判断条件
+// 通过运行这段代码来决定哪些模板块应该被渲染，哪些模板块应该被忽略
 function genIfConditions(
   conditions: ASTIfConditions,
   state: CodegenState,
   altGen?: Function,
   altEmpty?: string
 ): string {
+
+  // 如果没给判断条件，返回一个空的代码
   if (!conditions.length) {
     return altEmpty || '_e()'
   }
 
+  // 取出第一个判断条件
   const condition = conditions.shift()!
+
+  // 如果存在表达式
   if (condition.exp) {
     return `(${condition.exp})?${genTernaryExp(
       condition.block
     )}:${genIfConditions(conditions, state, altGen, altEmpty)}`
   } else {
+    // 不存在则返回一个生成三元表达式的代码
     return `${genTernaryExp(condition.block)}`
   }
 
   // v-if with v-once should generate code like (a)?_m(0):_m(1)
+  // v-if 与 v-once 同时存在的时候应该使用三元运算符，比如说 (a)?_m(0):_m(1)
   function genTernaryExp(el) {
     return altGen
       ? altGen(el, state)
@@ -239,17 +291,28 @@ function genIfConditions(
   }
 }
 
+// 处理 v-for 节点
 export function genFor(
   el: any,
   state: CodegenState,
   altGen?: Function,
   altHelper?: string
 ): string {
+  // 举例：<my-component v-for="(value, name, index) in obj" :key="name"></my-component>
+  // exp: obj
+  // alias: value
+  // iterator1: name
+  // iterator2: index
+
+  // v-for 的表达式
   const exp = el.for
   const alias = el.alias
   const iterator1 = el.iterator1 ? `,${el.iterator1}` : ''
   const iterator2 = el.iterator2 ? `,${el.iterator2}` : ''
 
+  // 检查 v-for 放在组件上
+  // 不是 slot && 不是 template 节点
+  // 没有传递 key
   if (
     __DEV__ &&
     state.maybeComponent(el) &&
@@ -257,6 +320,7 @@ export function genFor(
     el.tag !== 'template' &&
     !el.key
   ) {
+    // 每个组件应该有一个唯一的 key，以提高 Vue 的渲染性能，方便 Vue 跟踪每个节点的状态
     state.warn(
       `<${el.tag} v-for="${alias} in ${exp}">: component lists rendered with ` +
         `v-for should have explicit keys. ` +
@@ -266,7 +330,12 @@ export function genFor(
     )
   }
 
+  // 标记处理过
   el.forProcessed = true // avoid recursion
+
+  // 返回一个生成的函数表达式
+  // 接受一个参数（由 v-for 的表达式提供），然后返回一个调用函数（由 altGen 或 genElement 提供）的结果
+  // '_l((obj), function(value, name, index){ return _c('my-component', {key: name}) })'
   return (
     `${altHelper || '_l'}((${exp}),` +
     `function(${alias}${iterator1}${iterator2}){` +
@@ -511,6 +580,7 @@ function genScopedSlot(el: ASTElement, state: CodegenState): string {
   return `{key:${el.slotTarget || `"default"`},fn:${fn}${reverseProxy}}`
 }
 
+// 处理 children
 export function genChildren(
   el: ASTElement,
   state: CodegenState,
@@ -518,27 +588,40 @@ export function genChildren(
   altGenElement?: Function,
   altGenNode?: Function
 ): string | void {
+
+  // 拿到子节点
   const children = el.children
   if (children.length) {
+
+    // 拿到第一个节点
     const el: any = children[0]
     // optimize single v-for
+    // 如果只有一个节点，并且使用了 v-for
+    // 不是 template && 不是 slot
+    // 进行优化处理
     if (
       children.length === 1 &&
       el.for &&
       el.tag !== 'template' &&
       el.tag !== 'slot'
     ) {
+      // 根据 checkSkip 判断是否可能是一个组件，如果是则后面添加 ,1，否则添加 ,0
       const normalizationType = checkSkip
         ? state.maybeComponent(el)
           ? `,1`
           : `,0`
         : ``
+
+      // 优化的方式是直接生成这个元素的代码，而不是生成一个数组
       return `${(altGenElement || genElement)(el, state)}${normalizationType}`
     }
     const normalizationType = checkSkip
       ? getNormalizationType(children, state.maybeComponent)
       : 0
+
+    // 用 genElement 处理 children，内部有子节点也会继续遍历
     const gen = altGenNode || genNode
+    // 生成一个数组，数组中的每个元素都是子节点的代码
     return `[${children.map(c => gen(c, state)).join(',')}]${
       normalizationType ? `,${normalizationType}` : ''
     }`
@@ -581,12 +664,16 @@ function needsNormalization(el: ASTElement): boolean {
   return el.for !== undefined || el.tag === 'template' || el.tag === 'slot'
 }
 
+// 具体节点处理
 function genNode(node: ASTNode, state: CodegenState): string {
   if (node.type === 1) {
+    // 非普通节点，直接调用 genElement
     return genElement(node, state)
   } else if (node.type === 3 && node.isComment) {
+    // 注释节点
     return genComment(node)
   } else {
+    // 文本节点
     return genText(node)
   }
 }

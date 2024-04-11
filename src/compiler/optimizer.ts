@@ -94,6 +94,8 @@ function markStaticRoots(node: ASTNode, isInFor: boolean) {
   if (node.type === 1) {
     // 对于已经是 static 的节点或者是 v-once 指令的节点，node.staticInFor = isInFor
     if (node.static || node.once) {
+
+      // 标记 for 循环中存在的 static、v-once 节点
       node.staticInFor = isInFor
     }
     // For a node to qualify as a static root, it should have children that
