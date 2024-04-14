@@ -357,6 +357,8 @@ export function defineComputed(
       )
     }
   }
+
+  // 利用 Object.defineProperty 对计算属性的 get 和 set 进行劫持
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
 
@@ -405,6 +407,7 @@ export function defineComputed(
 function createComputedGetter(key) {
 
   // 返回一个 getter 函数
+  // 重写计算属性的 get 方法，判断是否需要进行重新计算
   return function computedGetter() {
 
     // 拿到当前对应的 computedWatcher（观察者）
@@ -421,8 +424,8 @@ function createComputedGetter(key) {
         // 触发 get，然后执行自己的 get(传入的 computed 属性的 function)
         // evaluate => computedWatcher get => pushTarget(computedWatcher)
         // => 执行传入的 computed getFunc，尝试计算值 => 读取到了依赖的属性，触发依赖属性 getter
-        // => 触发依赖属性 dep.depend => 把 Dep 加到了 Watcher 的 deps 篮子里(让 Watcher 知道谁依赖了自己)
-        // => 触发 Watcher.addDep，把 Watcher 加到依赖属性的依赖篮子(subs)里，让依赖属性订阅 Watcher(让每个属性知道自己依赖谁)
+        // => 触发依赖属性 dep.depend => 把 Dep 加到了 Watcher 的 deps 篮子里(让 computedWatcher 知道依赖了什么属性)
+        // => 触发 Watcher.addDep，把 Watcher 加到依赖属性的依赖篮子(subs)里，让依赖属性订阅 Watcher(让每个属性知道自己依赖了 computedWatcher)
         // (也就是 computed 属性的 Watcher 和它所依赖的响应式值的 dep 相互保留了彼此)
         // => get 结束 popTarget
         // targetStack 是 [渲染watcher]
@@ -445,7 +448,7 @@ function createComputedGetter(key) {
         // 先让 computedWatcher 收集 渲染watcher 作为自己的依赖
         // 然后让 watcher 里面的 deps 都收集 渲染watcher
 
-        // 此时的 Dep.target 为 renderWatcher，所以进入了 Watcher.depend()
+        // 此时的 Dep.target 为 renderWatcher，所以进入了 watcher.depend()
         // watcher.depend() 方法中会触发所有的依赖属性的 deps.depend()
         // => 把 Dep 加到了 renderWatcher 的 deps 篮子里(让渲染 Watcher 知道谁依赖了自己)
         // => 让依赖属性的 Dep 的依赖篮子(subs)里中持有 renderWatcher(让每个属性知道自己依赖了 renderWatcher)
@@ -559,6 +562,8 @@ function createWatcher(
   */
   if (isPlainObject(handler)) {
     options = handler
+
+    // 这个代表真正用户传入的函数
     handler = handler.handler
   }
 

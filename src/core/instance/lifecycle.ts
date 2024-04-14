@@ -221,12 +221,15 @@ export function lifecycleMixin(Vue: typeof Component) {
   }
 }
 
+// 组件节点的挂载
 export function mountComponent(
   vm: Component,
   el: Element | null | undefined,
   hydrating?: boolean
 ): Component {
   vm.$el = el
+
+  // 没有 render 函数
   if (!vm.$options.render) {
     // @ts-expect-error invalid type
     vm.$options.render = createEmptyVNode
@@ -251,6 +254,9 @@ export function mountComponent(
       }
     }
   }
+
+  // beforeMount 钩子
+  // 在 beforeMount 之前仅仅做了一下 render 函数的校验
   callHook(vm, 'beforeMount')
 
   let updateComponent
@@ -259,6 +265,8 @@ export function mountComponent(
     updateComponent = () => {
       const name = vm._name
       const id = vm._uid
+
+      // 性能标记
       const startTag = `vue-perf-start:${id}`
       const endTag = `vue-perf-end:${id}`
 
@@ -487,10 +495,15 @@ export function callHook(
   const prevInst = currentInstance
   const prevScope = getCurrentScope()
   setContext && setCurrentInstance(vm)
+
+  // 拿到对应 hook 的处理函数
   const handlers = vm.$options[hook]
   const info = `${hook} hook`
+
+  // 依次执行生命周期 hook 对应的方法
   if (handlers) {
     for (let i = 0, j = handlers.length; i < j; i++) {
+      // vm，生命周期里面的 this 指向当前实例
       invokeWithErrorHandling(handlers[i], vm, args || null, vm, info)
     }
   }

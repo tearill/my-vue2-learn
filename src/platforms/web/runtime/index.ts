@@ -39,6 +39,8 @@ Vue.prototype.$mount = function (
   el?: string | Element,
   hydrating?: boolean
 ): Component {
+
+  // 查找一下根节点
   el = el && inBrowser ? query(el) : undefined
   return mountComponent(this, el, hydrating)
 }

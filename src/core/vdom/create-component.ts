@@ -33,6 +33,7 @@ export function getComponentName(options: ComponentOptions) {
 }
 
 // inline hooks to be invoked on component VNodes during patch
+// VNode 本身自带的钩子函数
 const componentVNodeHooks = {
   init(vnode: VNodeWithData, hydrating: boolean): boolean | void {
     if (
@@ -146,6 +147,7 @@ export function createComponent(
   resolveConstructorOptions(Ctor as typeof Component)
 
   // transform component v-model data into props & events
+  // 处理 v-model
   if (isDef(data.model)) {
     // @ts-expect-error
     transformModel(Ctor.options, data)
@@ -229,6 +231,7 @@ export function createComponentInstanceForVnode(
   return new vnode.componentOptions.Ctor(options)
 }
 
+// 挂载 VNode 和组件的钩子
 function installComponentHooks(data: VNodeData) {
   const hooks = data.hook || (data.hook = {})
   for (let i = 0; i < hooksToMerge.length; i++) {
@@ -254,6 +257,7 @@ function mergeHook(f1: any, f2: any): Function {
 
 // transform component v-model info (value and callback) into
 // prop and event handler respectively.
+// 把 v-model 拆成 value、event 和对应的 callback
 function transformModel(options, data: any) {
   const prop = (options.model && options.model.prop) || 'value'
   const event = (options.model && options.model.event) || 'input'
@@ -267,9 +271,13 @@ function transformModel(options, data: any) {
         ? existing.indexOf(callback) === -1
         : existing !== callback
     ) {
+
+      // 在监听到对应的 event 时，触发 callback 回调
       on[event] = [callback].concat(existing)
     }
   } else {
+
+    // 在监听到对应的 event 时，触发 callback 回调
     on[event] = callback
   }
 }

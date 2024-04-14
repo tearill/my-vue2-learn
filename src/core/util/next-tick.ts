@@ -123,6 +123,7 @@ export function nextTick(cb?: (...args: any[]) => any, ctx?: object) {
   callbacks.push(() => {
 
     // 不直接放入，包裹了一层，使得回调调用的时候支持错误处理
+    // 除了渲染Watcher  还有自己手动调用的 nextTick 一起被收集到数组
     if (cb) {
       try {
 
@@ -137,6 +138,7 @@ export function nextTick(cb?: (...args: any[]) => any, ctx?: object) {
   })
 
   // 当前没有异步任务正在执行
+  // 如果多次调用 nextTick  只会执行一次异步 等异步队列清空之后再把标志变为false
   if (!pending) {
     pending = true
 

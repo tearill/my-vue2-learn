@@ -24,6 +24,7 @@ import type { ComponentOptions } from 'types/options'
  * how to merge a parent option value and a child option
  * value into the final value.
  */
+// 合并策略
 const strats = config.optionMergeStrategies
 
 /**
@@ -151,16 +152,21 @@ strats.data = function (
 /**
  * Hooks and props are merged as arrays.
  */
+// 生命周期合并策略
 export function mergeLifecycleHook(
   parentVal: Array<Function> | null,
   childVal: Function | Array<Function> | null
 ): Array<Function> | null {
+
+  // 如果有儿子
   const res = childVal
     ? parentVal
+      // 合并成到父亲里面
       ? parentVal.concat(childVal)
+      // 自己包装成一个数组
       : isArray(childVal)
-      ? childVal
-      : [childVal]
+        ? childVal
+        : [childVal]
     : parentVal
   return res ? dedupeHooks(res) : res
 }
@@ -175,6 +181,7 @@ function dedupeHooks(hooks: any) {
   return res
 }
 
+// 为生命周期添加合并策略
 LIFECYCLE_HOOKS.forEach(hook => {
   strats[hook] = mergeLifecycleHook
 })
@@ -186,12 +193,15 @@ LIFECYCLE_HOOKS.forEach(hook => {
  * a three-way merge between constructor options, instance
  * options and parent options.
  */
+// 组件 指令 过滤器的合并策略
 function mergeAssets(
   parentVal: Object | null,
   childVal: Object | null,
   vm: Component | null,
   key: string
 ): Object {
+  // 比如有同名的全局组件和自己定义的局部组件，那么 parentVal 代表全局组件，自己定义的组件是 childVal
+  // 首先会查找自已局部组件有就用自己的，没有就从原型继承全局组件，res.__proto__ === parentVal
   const res = Object.create(parentVal || null)
   if (childVal) {
     __DEV__ && assertObjectType(key, childVal, vm)
@@ -201,6 +211,8 @@ function mergeAssets(
   }
 }
 
+// assets 合并
+// 组件 指令 过滤器的合并策略
 ASSET_TYPES.forEach(function (type) {
   strats[type + 's'] = mergeAssets
 })
@@ -496,14 +508,20 @@ export function mergeOptions(
 
   const options: ComponentOptions = {} as any
   let key
+
+  // 遍历父亲
   for (key in parent) {
     mergeField(key)
   }
+
+  // 父亲没有 儿子有
   for (key in child) {
     if (!hasOwn(parent, key)) {
       mergeField(key)
     }
   }
+
+  // 真正合并字段方法
   function mergeField(key: any) {
     const strat = strats[key] || defaultStrat
     options[key] = strat(parent[key], child[key], vm, key)

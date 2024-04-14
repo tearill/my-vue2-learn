@@ -65,12 +65,15 @@ const sortCompareFn = (a: Watcher, b: Watcher): number => {
   } else if (b.post) {
     return -1
   }
+
+  // 按照 id 从小到大排序
   return a.id - b.id
 }
 
 /**
  * Flush both queues and run the watchers.
  */
+// 刷新 Watcher 队列，执行 Watcher 更新
 function flushSchedulerQueue() {
   currentFlushTimestamp = getNow()
   flushing = true
@@ -84,10 +87,18 @@ function flushSchedulerQueue() {
   //    user watchers are created before the render watcher)
   // 3. If a component is destroyed during a parent component's watcher run,
   //    its watchers can be skipped.
+
+  // 在调用、更新前对 Watcher 队列进行一个排序
+  // 1. 保证组件的更新是先更新父节点，再更新子节点
+  // 2. user Watcher 闭渲染 Watcher 更早执行（引入 user Watcher 比渲染 Watcher 更早创建）
+  //    user Watcher 是 computedWatcher 和 watchWatcher，在 initState 的时候创建
+  //    renderWatcher 是在 mountComponent，也就是挂载节点的时候才进行创建
+  // 3. 如果在父组件 Watcher 运行的时候，这个组件被销毁了，这个组件对应的 Watcher 就不需要再执行了
   queue.sort(sortCompareFn)
 
   // do not cache length because more watchers might be pushed
   // as we run existing watchers
+  // 不缓存队列长度，因为在更新的时候可能会触发另外的更新，导致又添加了新的 Watcher 进来
   for (index = 0; index < queue.length; index++) {
     watcher = queue[index]
     if (watcher.before) {
@@ -95,6 +106,8 @@ function flushSchedulerQueue() {
     }
     id = watcher.id
     has[id] = null
+
+    // 真正调用 watcher 更新的地方
     watcher.run()
     // in dev build, check and stop circular updates.
     if (__DEV__ && has[id] != null) {
@@ -172,6 +185,7 @@ export function queueWatcher(watcher: Watcher) {
   const id = watcher.id
 
   // 如果存在相同的 id，跳过
+  // watcher 去重
   if (has[id] != null) {
     return
   }
@@ -209,6 +223,8 @@ export function queueWatcher(watcher: Watcher) {
       flushSchedulerQueue()
       return
     }
+
+    // 进行异步调用
     nextTick(flushSchedulerQueue)
   }
 }

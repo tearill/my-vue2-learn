@@ -148,6 +148,7 @@ export default class Watcher implements DepTarget {
 
     // computedWatcher 在首次进来的时候不会调用 get 求值
     // 非 computed watcher 会执行 get() 方法
+    // 实例化就进行一次取值操作，进行依赖收集过程
     this.value = this.lazy ? undefined : this.get()
   }
 
@@ -269,8 +270,10 @@ export default class Watcher implements DepTarget {
     if (this.active) {
       // get 操作在获取 value 本身也会执行 getter
       // 从而调用 update 更新视图
+      // 获取一次新的 value
       const value = this.get()
       if (
+        // 新旧 value 不一样，说明发生了变化
         value !== this.value ||
         // Deep watchers and watchers on Object/Arrays should fire even
         // when the value is the same, because the value may
@@ -283,7 +286,8 @@ export default class Watcher implements DepTarget {
         // 设置新的值
         this.value = value
 
-        // 触发 Watcher 回调
+        // 触发 user Watcher 回调
+        // 其实这里只会有 watchWatcher
         if (this.user) {
           const info = `callback for watcher "${this.expression}"`
 
@@ -298,6 +302,7 @@ export default class Watcher implements DepTarget {
             info
           )
         } else {
+          // renderWatcher
           this.cb.call(this.vm, value, oldValue)
         }
       }
@@ -330,6 +335,7 @@ export default class Watcher implements DepTarget {
     while (i--) {
 
       // 添加依赖
+      // 调用依赖项的 dep 去收集渲染 watcher
       this.deps[i].depend()
     }
   }

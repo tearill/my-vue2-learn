@@ -41,7 +41,10 @@ methodsToPatch.forEach(function (method) {
         inserted = args.slice(2)
         break
     }
+
+    // 如果发生了新增操作，对新增的每一项进行观测
     if (inserted) ob.observeArray(inserted)
+
     // notify change
     if (__DEV__) {
       ob.dep.notify({
@@ -50,6 +53,8 @@ methodsToPatch.forEach(function (method) {
         key: method
       })
     } else {
+
+      // 检测到变化，通知所有 dep 管家，让他去通知所有的 watcher 进行更新
       ob.dep.notify()
     }
     return result

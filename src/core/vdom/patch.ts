@@ -86,8 +86,13 @@ export function createPatchFunction(backend) {
   let i, j
   const cbs: any = {}
 
+  /**
+   * modules: { ref, directives, 平台特有的一些操纵，比如 attr、class、style 等 }
+   * nodeOps: { 对 DOM 元素的增删改查 API }
+   */
   const { modules, nodeOps } = backend
 
+  // 把 attrs, class, events, domProps, style, transition 等等这些内容对应的钩子放到 cbs 里面，方便调用
   for (i = 0; i < hooks.length; ++i) {
     cbs[hooks[i]] = []
     for (j = 0; j < modules.length; ++j) {
@@ -601,6 +606,7 @@ export function createPatchFunction(backend) {
           : findIdxInOld(newStartVnode, oldCh, oldStartIdx, oldEndIdx)
 
         // 新的 children 里有，可是没有在老的 children 里找到对应的元素
+        // 在旧 vnode 里没找到，说明是新增的
         if (isUndef(idxInOld)) {
           // New element
           // 直接创建新的节点
@@ -614,12 +620,13 @@ export function createPatchFunction(backend) {
             newStartIdx
           )
         } else {
-          // 找到了对应的 key 的元素
+          // 找到了对应的 key 的元素，进行移动操作
 
           // 需要移动的元素
+          // 找得到就拿到老的节点
           vnodeToMove = oldCh[idxInOld]
 
-          // 如果相同
+          // 如果是相同 VNode 节点
           if (sameVnode(vnodeToMove, newStartVnode)) {
 
             // 把两个相同的节点做一个更新
@@ -630,6 +637,8 @@ export function createPatchFunction(backend) {
               newCh,
               newStartIdx
             )
+            // 占位，防止塌陷
+            // 防止老节点移动走了之后破坏了初始的映射表位置
             oldCh[idxInOld] = undefined
             canMove &&
               nodeOps.insertBefore(

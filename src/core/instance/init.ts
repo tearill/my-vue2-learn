@@ -53,6 +53,7 @@ export function initMixin(Vue: typeof Component) {
     } else {
 
       // 里面会有规范化的过程
+      // 合并 options，合并全局 options 和组件自己的 options
       vm.$options = mergeOptions(
         resolveConstructorOptions(vm.constructor as any),
         options || {},

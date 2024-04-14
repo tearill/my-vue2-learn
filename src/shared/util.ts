@@ -257,6 +257,8 @@ export function extend(
   _from?: Record<PropertyKey, any>
 ): Record<PropertyKey, any> {
   for (const key in _from) {
+    // 这里没做 hasOwnProperty 的限制
+    // 所以当 _from 上没有的时候，会去 _from 的原型链上查找
     to[key] = _from[key]
   }
   return to
