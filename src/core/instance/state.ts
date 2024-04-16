@@ -429,6 +429,7 @@ function createComputedGetter(key) {
         // (也就是 computed 属性的 Watcher 和它所依赖的响应式值的 dep 相互保留了彼此)
         // => get 结束 popTarget
         // targetStack 是 [渲染watcher]
+        // computedWatcher <=> dep data
         watcher.evaluate()
       }
 
